@@ -1,0 +1,12 @@
+{
+    "name": "connect4-server",
+    "version": "1.0.0",
+    "main": "index.js",
+    "type": "commonjs",
+    "scripts": {
+        "dev": "nodemon index.js"
+    },
+    "dependencies": {
+        "socket.io-client": "^4.8.1"
+    }
+}
