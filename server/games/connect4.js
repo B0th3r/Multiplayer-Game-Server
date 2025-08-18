@@ -23,7 +23,7 @@ const connect4 = {
     minPlayers: 2,
     maxPlayers: 2,
 
-    seatLabel: (seat) => (seat === 0 ? 'R' : seat === 1 ? 'Y' : null),
+    seatLabel: (seat) => (seat === 0 ? 'R' : seat === 1 ? 'Y' : 'G'),
 
     assignSeats(room) {
         room.players.forEach((p, i) => { p.seat = i < 2 ? i : null; });

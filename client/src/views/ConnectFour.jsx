@@ -13,7 +13,9 @@ function Disc({ value }) {
         ? "bg-white border-gray-300"
         : value === "R"
             ? "bg-red-500 border-red-600"
-            : "bg-yellow-400 border-yellow-500";
+            : value === "G"
+                ? "bg-green-500 border-green-600"
+                : "bg-yellow-400 border-yellow-500";
     return <div className={`${base} ${color}`} />;
 }
 
@@ -55,6 +57,7 @@ export default function ConnectFour() {
 
         const onPhase = ({ phase, roomId: rid }) => {
             if (phase === "lobby") {
+                alert("Host has ended the game")
                 navigate(`/room/${encodeURIComponent(rid)}`, { replace: true });
             }
         };
@@ -66,6 +69,11 @@ export default function ConnectFour() {
             socket.off("phase", onPhase);
         };
     }, [socket, navigate]);
+    const EndGame = () => {
+        socket.emit("host_end_game", (resp) => {
+            if (!resp?.ok) alert(resp?.code || "Could not end");
+        });
+    };
     const myColor = useMemo(() => {
         if (!you?.id) return null;
         return players.find((p) => p.id === you.id)?.color ?? null;
@@ -77,6 +85,7 @@ export default function ConnectFour() {
         if (winner === "draw") return "It's a draw.";
         if (winner === "R") return "Red wins!";
         if (winner === "Y") return "Yellow wins!";
+        if (myColor === "G") return "spectating"
         return current === myColor ? "Your turn" : "Opponent's turn";
     }, [conn, myColor, winner, current]);
 
@@ -104,7 +113,9 @@ export default function ConnectFour() {
                                 ? "border-emerald-400"
                                 : myColor === "R"
                                     ? "border-red-400"
-                                    : "border-yellow-400"
+                                    : myColor === "G"
+                                        ? "border-green-400"
+                                        : "border-yellow-400"
                                 }`}
                         >
                             <Disc value={winner ? (winner === "draw" ? null : winner) : myColor} />
@@ -122,9 +133,10 @@ export default function ConnectFour() {
                 </header>
 
                 <div className="text-sm text-slate-600 flex items-center gap-3">
-                    <Link to={`/room/${encodeURIComponent(roomId)}`} className="underline">
+                    <button
+                        onClick={EndGame}>
                         Back to Lobby
-                    </Link>
+                    </button>
                     <span>Room: <code>{roomId}</code></span>
                     <span>
                         WS: {conn} • You: {myColor || "—"} • Players: {players.map(p => p.color).join(", ") || "—"}

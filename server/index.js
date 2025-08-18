@@ -77,7 +77,6 @@ io.on('connection', (socket) => {
 
         const room = getRoom(roomId) || createRoom(roomId);
 
-
         let p = room.players.find(p => p.id === socket.id);
         if (!p) {
             p = { id: socket.id, name: name?.trim() || socket.data.name, seat: null };
@@ -144,7 +143,25 @@ io.on('connection', (socket) => {
         broadcastState(room.id);
         ack?.({ ok: true });
     });
+    socket.on('host_end_game', (ack) => {
+        const room = getRoom(socket.data.roomId);
+        if (!room) return ack?.({ ok: false, code: 'NO_ROOM' });
+        if (socket.id !== room.hostId) return ack?.({ ok: false, code: 'NOT_HOST' });
 
+
+
+        room.phase = `lobby`;
+
+        io.to(room.id).emit('phase', {
+            roomId: room.id,
+            hostId: room.hostId,
+            phase: room.phase,
+            gameId: room.game.id,
+        });
+
+        broadcastState(room.id);
+        ack?.({ ok: true });
+    });
 
     socket.on('action', (action) => {
         const room = getRoom(socket.data.roomId);
@@ -174,7 +191,10 @@ io.on('connection', (socket) => {
         if (!room || !room.game) return;
         const game = currentGame(room);
         if (!game) return;
-
+        const p = room.players.find(p => p.id === socket.id);
+        if (p.seat == null) {
+            return;
+        }
         game.assignSeats(room);
         room.game.state = game.initState();
 

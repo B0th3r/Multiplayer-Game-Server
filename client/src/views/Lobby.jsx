@@ -53,7 +53,7 @@ export default function Lobby() {
         [players, you?.id]
     );
 
-    const isReady = !!you?.host && players.length === 2;
+    const isReady = !!you?.host && players.length >= 2;
 
     const startGame = (gameId) => {
         socket.emit("host_choose_game", { gameId }, (resp) => {
