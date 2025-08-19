@@ -178,10 +178,6 @@ export default function ConnectFour() {
                         </div>
                     </div>
                 </div>
-
-                <p className="mt-3 text-xs text-slate-500">
-                    Open this URL in two tabs to play. The server is authoritative; clicks only request moves.
-                </p>
             </div>
         </div>
     );

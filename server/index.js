@@ -9,8 +9,10 @@ const io = new Server(server, { cors: { origin: '*' } });
 const games = new Map();
 
 const { connect4 } = require('./games/connect4');
+const { tictactoe } = require('./games/tictactoe');
 
 games.set(connect4.id, connect4);
+games.set(tictactoe.id, tictactoe);
 
 const rooms = new Map();
 
