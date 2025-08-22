@@ -134,6 +134,13 @@ export default function Lobby() {
                         >
                             Start TicTacToe
                         </button>
+                        <button
+                            onClick={() => startGame("battleship")}
+                            disabled={!isReady}
+                            className="rounded-xl border px-3 py-2 text-sm disabled:opacity-50"
+                        >
+                            Start Battleship
+                        </button>
                     </div>
                     {!isReady && (
                         <p className="text-xs text-slate-500">

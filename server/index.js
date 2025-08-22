@@ -10,9 +10,11 @@ const games = new Map();
 
 const { connect4 } = require('./games/connect4');
 const { tictactoe } = require('./games/tictactoe');
+const { battleship } = require('./games/battleship');
 
 games.set(connect4.id, connect4);
 games.set(tictactoe.id, tictactoe);
+games.set(battleship.id, battleship);
 
 const rooms = new Map();
 
@@ -67,7 +69,10 @@ function broadcastState(roomId) {
     if (!room) return;
     const game = currentGame(room);
     if (!game) return;
-    io.to(roomId).emit('state', game.serialize(room));
+    room.players.forEach(p => {
+        const payload = game.serialize(room, p.id);
+        io.to(p.id).emit('state', payload);
+    });
 }
 
 io.on('connection', (socket) => {
@@ -165,16 +170,25 @@ io.on('connection', (socket) => {
         ack?.({ ok: true });
     });
 
-    socket.on('action', (action) => {
+    socket.on('action', (action, ack) => {
         const room = getRoom(socket.data.roomId);
-        if (!room || !room.game) return;
+        if (!room || !room.game) return ack?.({ ok: false, code: 'NO_GAME' });
         const game = currentGame(room);
-        if (!game) return;
+        if (!game) return ack?.({ ok: false, code: 'UNKNOWN_GAME' });
 
-        if (!game.canAct(room, socket, action)) return;
+        const a = { ...action, _by: socket.id };
 
-        game.reduce(room, action);
-        broadcastState(room.id);
+        const ok = game.canAct ? game.canAct(room, socket, a) : true;
+        if (!ok) return ack?.({ ok: false, code: 'CANNOT_ACT' });
+
+        try {
+            const res = game.reduce(room, a);
+            broadcastState(room.id);
+            return ack?.({ ok: true, res });
+        } catch (err) {
+            console.error('reduce error', err);
+            return ack?.({ ok: false, code: 'REDUCE_ERROR' });
+        }
     });
 
     socket.on('drop', ({ col }) => {
