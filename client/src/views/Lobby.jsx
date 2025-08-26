@@ -72,8 +72,8 @@ export default function Lobby() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
-            <div className="w-full max-w-lg space-y-4">
+        <div className="min-h-screen flex items-center justify-center p-6 ">
+            <div className="w-full max-w-lg space-y-4 ">
                 <div className="flex items-center justify-between">
                     <h1 className="text-2xl font-bold">Lobby: <code>{roomId}</code></h1>
                     <Link to="/" className="underline text-sm">Back</Link>
@@ -83,7 +83,7 @@ export default function Lobby() {
                     WS: {conn} • You: {you?.id ? (you?.host ? "Host" : "Guest") : "(joining…)"}
                 </p>
 
-                <div className="rounded-xl border p-3 bg-white">
+                <div className="rounded-xl border p-3 ">
                     <div className="font-semibold mb-2">Players</div>
                     <ul className="space-y-1">
                         {players.map((p) => (
@@ -96,7 +96,7 @@ export default function Lobby() {
                     </ul>
                 </div>
 
-                <div className="rounded-xl border p-3 bg-white space-y-2">
+                <div className="rounded-xl border p-3 space-y-2">
                     <div className="font-semibold">Your name</div>
                     <div className="flex gap-2">
                         <input
@@ -117,7 +117,7 @@ export default function Lobby() {
                     </button>
                 </div>
 
-                <div className="rounded-xl border p-3 bg-white space-y-2">
+                <div className="rounded-xl border p-3 space-y-2">
                     <div className="font-semibold mb-2">Pick a game (host only)</div>
                     <div className="flex gap-2">
                         <button

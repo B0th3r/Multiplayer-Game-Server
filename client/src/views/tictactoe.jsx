@@ -8,7 +8,8 @@ const makeEmptyBoard = () =>
 
 function Cell({ value }) {
     const base =
-        "flex items-center justify-center h-16 w-16 rounded-xl bg-white border shadow-sm text-2xl font-bold";
+        "h-16 w-16 flex items-center justify-center rounded-xl bg-white shadow-sm text-2xl font-bold";
+
     const color =
         value === "X"
             ? "text-red-600 border-red-300"
@@ -78,14 +79,13 @@ export default function TicTacToe() {
     const handlePlace = (r, c) => {
         if (conn !== "connected" || !mySymbol || winner) return;
         if (current !== mySymbol) return;
-        // let the server validate occupied cells, bounds, turn, etc.
         socket.emit("action", { type: "place", r, c });
     };
 
     const reset = () => socket.emit("reset");
 
     return (
-        <div className="min-h-screen w-full bg-slate-50 flex items-center justify-center p-6">
+        <div className="min-h-screen w-full flex items-center justify-center p-6">
             <div className="w-full max-w-md space-y-4">
                 <header className="flex items-center justify-between">
                     <h1 className="text-2xl font-bold">Tic Tac Toe</h1>
@@ -124,7 +124,7 @@ export default function TicTacToe() {
                     </span>
                 </div>
 
-                <div className="rounded-xl border bg-blue-50 p-4 shadow-md">
+                <div className="rounded-x border bg-blue-50 bg-slate-800 p-4 shadow-md">
                     <div
                         className="grid gap-2"
                         style={{ gridTemplateColumns: `repeat(${SIZE}, minmax(0, 1fr))` }}
@@ -134,7 +134,7 @@ export default function TicTacToe() {
                                 <button
                                     key={`${r}-${c}`}
                                     onClick={() => handlePlace(r, c)}
-                                    className="rounded-xl bg-blue-100 p-2 transition active:scale-[0.98] focus:outline-none focus:ring"
+                                    className="flex items-center justify-center rounded-xl bg-slate-600 p-2 transition active:scale-[0.98]"
                                     disabled={conn !== "connected" || !!winner || !!cell || !mySymbol || current !== mySymbol}
                                     aria-label={`Row ${r + 1}, Column ${c + 1}`}
                                 >

@@ -103,11 +103,11 @@ export default function ConnectFour() {
     };
 
     return (
-        <div className="min-h-screen w-full bg-slate-50 flex items-center justify-center p-6">
-            <div className="w-full max-w-3xl space-y-4">
-                <header className="flex items-center justify-between">
+        <div className="min-h-screen w-full flex items-center justify-center p-6">
+            <div className="w-full max-w-3xl space-y-4 ">
+                <header className="flex items-center justify-between ">
                     <h1 className="text-2xl font-bold">Connect Four</h1>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 ">
                         <span
                             className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm ${winner
                                 ? "border-emerald-400"
@@ -143,9 +143,9 @@ export default function ConnectFour() {
                     </span>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <div className="rounded-xl border bg-blue-50 p-2 shadow-md" role="grid" aria-label="Connect Four board">
-                        <div className="grid grid-cols-7 gap-2">
+                <div className="overflow-x-auto ">
+                    <div className="rounded-xl border p-2 shadow-md  bg-slate-700  " role="grid" aria-label="Connect Four board">
+                        <div className="grid grid-cols-7 gap-2 ">
                             {Array.from({ length: COLS }).map((_, c) => (
                                 <ColumnHeader
                                     key={`h-${c}`}
@@ -161,13 +161,13 @@ export default function ConnectFour() {
                             ))}
                         </div>
 
-                        <div className="grid grid-cols-7 gap-2 p-2 bg-blue-100 rounded-b-xl">
+                        <div className="grid grid-cols-7 gap-2 p-2 rounded-b-xl">
                             {board.map((row, r) =>
                                 row.map((cell, c) => (
                                     <button
                                         key={`${r}-${c}`}
                                         onClick={() => handleDrop(c)}
-                                        className="aspect-square rounded-xl bg-blue-200 p-2 transition active:scale-[0.98] focus:outline-none focus:ring"
+                                        className="aspect-square rounded-xl bg-slate-800 p-2 transition active:scale-[0.98] focus:outline-none focus:ring"
                                         aria-label={`Row ${r + 1}, Column ${c + 1}`}
                                         disabled={conn !== "connected" || !myColor || !!winner || current !== myColor}
                                     >

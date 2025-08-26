@@ -446,12 +446,12 @@ export default function Battleship() {
                 <div className="w-full max-w-md text-center space-y-4">
                     <h1 className="text-2xl font-bold">Battleship</h1>
                     <div className="rounded-2xl border bg-white p-6 shadow-sm">
-                        <p className="text-slate-700 font-medium">Players are placing ships…</p>
+                        <p className="text-slate-300 font-medium">Players are placing ships…</p>
                         <p className="text-slate-500 text-sm mt-1">
                             You're spectating this match. The battle view will appear when setup is complete.
                         </p>
                     </div>
-                    <div className="text-sm text-slate-600 flex items-center justify-center gap-3">
+                    <div className="text-sm text-slate-300 flex items-center justify-center gap-3">
                         <button onClick={EndGame} className="underline">
                             End game
                         </button>
@@ -466,7 +466,7 @@ export default function Battleship() {
     }
 
     return (
-        <div className="min-h-screen w-full bg-slate-50 flex items-center justify-center p-6">
+        <div className="min-h-screen w-full bg-slate-700 flex items-center justify-center p-6">
             <div className="w-full max-w-5xl space-y-4">
                 <header className="flex items-center justify-between">
                     <h1 className="text-2xl font-bold">Battleship</h1>
@@ -494,7 +494,7 @@ export default function Battleship() {
                     </div>
                 </header>
 
-                <div className="text-sm text-slate-600 flex items-center gap-3">
+                <div className="text-sm text-slate-300 flex items-center gap-3">
                     <button onClick={EndGame}>Back to Lobby</button>
                     <span>
                         Room: <code>{roomId}</code>
@@ -505,13 +505,13 @@ export default function Battleship() {
                 </div>
 
                 {/* Controls */}
-                <div className="rounded-xl border p-3 bg-white">
+                <div className="rounded-xl border p-3">
                     <div className="font-semibold mb-2">Controls</div>
 
                     {st?.phase === "setup" ? (
                         <div className="flex flex-wrap items-center gap-3">
                             <div className="flex items-center gap-2">
-                                <span className="text-sm text-slate-600">Ship:</span>
+                                <span className="text-sm text-slate-300">Ship:</span>
                                 <select
                                     className="rounded-lg border px-2 py-1 text-sm"
                                     value={selectedShip}
@@ -566,7 +566,7 @@ export default function Battleship() {
                                 {me?.ready ? "Ready ✓" : "Ready"}
                             </button>
 
-                            <div className="ml-auto flex items-center gap-3 text-xs text-slate-500">
+                            <div className="ml-auto flex items-center gap-3 text-xs text-slate-300">
                                 <span className="flex items-center gap-1">
                                     <LegendDot kind="ship" /> Your ships
                                 </span>
@@ -599,7 +599,7 @@ export default function Battleship() {
                 {/* Boards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Your Board */}
-                    <div className="rounded-xl border bg-blue-50 p-3 shadow-md">
+                    <div className="rounded-xl border bg-blue-50 p-3 shadow-md bg-slate-800 ">
                         <div className="font-semibold mb-2">Your Board</div>
                         <div
                             className="grid gap-1"
@@ -614,7 +614,7 @@ export default function Battleship() {
                     </div>
 
                     {/* Target Board */}
-                    <div className="rounded-xl border bg-blue-50 p-3 shadow-md">
+                    <div className="rounded-xl border bg-blue-50 p-3 shadow-md bg-slate-800 ">
                         <div className="font-semibold mb-2">Target Board</div>
                         <div
                             className="grid gap-1"
@@ -629,7 +629,7 @@ export default function Battleship() {
                     </div>
                 </div>
 
-                <p className="mt-3 text-xs text-slate-500">
+                <p className="mt-3 text-xs text-slate-300">
                     Setup: select ship & direction, click on your board to place. Hit “Ready” when
                     all ships placed. Battle: click on the target board to fire. Server is
                     authoritative; UI only sends intents.

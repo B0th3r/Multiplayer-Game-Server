@@ -158,15 +158,18 @@ io.on('connection', (socket) => {
 
 
         room.phase = `lobby`;
+        room.game = null;
+        room.players.forEach(p => {
+            p.seat = null;
+        });
 
         io.to(room.id).emit('phase', {
             roomId: room.id,
             hostId: room.hostId,
             phase: room.phase,
-            gameId: room.game.id,
+            gameId: null,
         });
-
-        broadcastState(room.id);
+        broadcastLobby(room.id);
         ack?.({ ok: true });
     });
 
@@ -191,30 +194,19 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('drop', ({ col }) => {
+    socket.on('reset', (ack) => {
         const room = getRoom(socket.data.roomId);
-        if (!room || !room.game) return;
-        if (room.game.id !== 'connect4') return;
+        if (!room || !room.game) return ack?.({ ok: false, code: 'NO_GAME' });
         const game = currentGame(room);
-        const ok = game.canAct(room, socket, { type: 'drop', col });
-        if (!ok) return;
-        game.reduce(room, { type: 'drop', col });
-        broadcastState(room.id);
-    });
+        if (!game) return ack?.({ ok: false, code: 'UNKNOWN_GAME' });
 
-    socket.on('reset', () => {
-        const room = getRoom(socket.data.roomId);
-        if (!room || !room.game) return;
-        const game = currentGame(room);
-        if (!game) return;
         const p = room.players.find(p => p.id === socket.id);
-        if (p.seat == null) {
-            return;
-        }
+        if (p.seat == null) return ack?.({ ok: false, code: 'NOT_A_PLAYER' });
+
         game.assignSeats(room);
         room.game.state = game.initState();
-
         broadcastState(room.id);
+        return ack?.({ ok: true });
     });
 
     function removeFromRoom() {
