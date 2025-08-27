@@ -23,7 +23,7 @@ export default function RoomEntry() {
             {showIntro && (
                 <OverlayIntro
                     onFinish={handleIntroFinish}
-                    message={`Welcome, Player.\nMultiplayer session detected.\nPRESS START_`}
+                    message={`Welcome to the Bother Arcade`}
                 />
             )}
 

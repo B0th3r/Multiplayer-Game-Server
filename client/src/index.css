@@ -1,4 +1,53 @@
 @import "tailwindcss";
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+
+body {
+    background: radial-gradient(circle at center, #0b0f0d 0%, #050705 100%);
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(to bottom,
+            rgba(0, 255, 128, 0.03) 0px,
+            rgba(0, 255, 128, 0.03) 1px,
+            transparent 2px,
+            transparent 4px);
+    pointer-events: none;
+}
+
+@keyframes press-key {
+
+    0%,
+    100% {
+        opacity: 0.6;
+        transform: scale(1);
+        text-shadow: 0 0 8px rgba(0, 255, 0, 0.8);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.05);
+        text-shadow: 0 0 16px rgba(0, 255, 0, 1);
+    }
+}
+
+.animate-press-key {
+    animation: press-key 1.5s infinite ease-in-out;
+}
+
+@keyframes crt-sweep {
+    0% {
+        transform: translateY(-30%);
+        opacity: .7;
+    }
+
+    85% {
+        opacity: .35;
+    }
+
+    100% {
+        transform: translateY(130%);
+        opacity: 0;
+    }
+}
