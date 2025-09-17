@@ -10,7 +10,7 @@ function AppShell() {
         <div className="min-h-screen flex flex-col bg-black text-green-300 font-mono selection:bg-green-600/20">
             <header className="sticky top-0 z-50 px-4 py-3 border-b border-green-700/30 bg-black/80 backdrop-blur-sm">
                 <div className="max-w-5xl mx-auto flex items-center justify-between">
-                    <span className="tracking-wider animate-pulse">PORTFOLIO ARCADE</span>
+                    <span className="tracking-wider animate-pulse">BOB'S ARCADE</span>
                     <span className="text-xs text-green-500/70">v1.0</span>
                 </div>
             </header>
@@ -21,7 +21,7 @@ function AppShell() {
 
             <footer className="sticky bottom-0 z-50 px-4 py-2 border-t border-green-700/30 bg-black/80 backdrop-blur-sm">
                 <div className="max-w-5xl mx-auto flex items-center justify-between text-xs">
-                    <span className="text-green-500/70">© 2025 Your Name</span>
+                    <span className="text-green-500/70">© 2025 Keshawn Bryant</span>
                     <span className="tracking-widest">[PRESS START]</span>
                 </div>
             </footer>

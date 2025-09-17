@@ -61,8 +61,9 @@ export default function OverlayIntro({ onFinish, message }) {
                 />
             </div>
 
-            <h1 className="pt-15 text-6xl font-bold text-green-500 drop-shadow-[0_0_8px_rgba(0,255,0,0.75)] mb-15">
-                Bother Arcade
+            <h1 className="text-center self-center mx-auto mt-16 mb-6 text-5xl sm:text-6xl font-bold
+        text-green-500 drop-shadow-[0_0_8px_rgba(0,255,0,0.75)]">
+                BOB'S ARCADE
             </h1>
 
             <div className="relative px-6 text-center">
