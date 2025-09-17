@@ -1,247 +1,111 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
-
-const games = new Map();
+const registerSocketEvents = require('./events');
 
 const { connect4 } = require('./games/connect4');
 const { tictactoe } = require('./games/tictactoe');
 const { battleship } = require('./games/battleship');
 
-games.set(connect4.id, connect4);
-games.set(tictactoe.id, tictactoe);
-games.set(battleship.id, battleship);
+function createServer({ injectedGames } = {}) {
+    const app = express();
+    const server = http.createServer(app);
+    const parseOrigins = (s) =>
+  new Set((s || '').split(',').map(o => o.trim()).filter(Boolean));
+const ALLOWED_ORIGINS = parseOrigins(process.env.CORS_ORIGINS);
+const originOK = (origin) => !origin || ALLOWED_ORIGINS.has(origin);
 
-const rooms = new Map();
+const io = new Server(server, {
+  cors: {
+    origin: (origin, cb) => originOK(origin) ? cb(null, true) : cb(new Error('CORS: origin not allowed')),
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: !!process.env.CORS_CREDENTIALS,
+    maxAge: 86400,
+  },
+});
+io.use((socket, next) => {
+  const origin = socket.handshake.headers.origin;
+  if (!originOK(origin)) return next(new Error('Origin blocked'));
+  next();
+});
+    const MAX_NAME = 32;
+    const reply = (ack, p) => typeof ack === 'function' && ack(p);
+    const ok = (ack, extra = {}) => reply(ack, { ok: true, ...extra });
+    const err = (ack, code, extra = {}) => reply(ack, { ok: false, code, ...extra });
+    const cleanName = (s, fb) => (typeof s === 'string' && s.trim() ? s.trim().slice(0, MAX_NAME) : fb);
+    const isRoomId = s => typeof s === 'string' && /^[\w-]{1,40}$/.test(s);
 
-function getRoom(id) {
-    return rooms.get(id);
-}
-
-function createRoom(id) {
-    const room = {
-        id,
-        hostId: null,
-        players: [],
-        phase: 'lobby',
-        game: null,
+    const roomsMap = new Map();
+    const getRoom = (id) => roomsMap.get(id);
+    const ensureRoom = (id) => {
+        let r = roomsMap.get(id);
+        if (!r) { r = { id, hostId: null, players: [], phase: 'lobby', game: null }; roomsMap.set(id, r); }
+        return r;
     };
-    rooms.set(id, room);
-    return room;
-}
+    const ensureHost = (room) => { room.hostId = room.players[0]?.id || null; };
+    const maybeDelete = (room) => { if (room.players.length === 0) roomsMap.delete(room.id); };
 
-function ensureHost(room) {
-    room.hostId = room.players[0]?.id || null;
-}
+    const games = injectedGames || new Map([
+        ['connect4', connect4],
+        ['tictactoe', tictactoe],
+        ['battleship', battleship],
+    ]);
 
-function currentGame(room) {
-    return room?.game ? games.get(room.game.id) : null;
-}
-
-function serializeLobby(room) {
-    const game = currentGame(room);
-    return {
+    const getCurrentGame = (room) => room?.game ? games.get(room.game.id) : null;
+    const seatLabelFor = (room, seat) => {
+        const g = getCurrentGame(room);
+        return g ? g.seatLabel(seat) : null;
+    };
+    const serializeLobby = (room) => ({
         roomId: room.id,
         hostId: room.hostId,
         phase: room.phase,
         gameId: room.game?.id || null,
-        players: room.players.map(p => ({
-            id: p.id,
-            name: p.name,
-            // If a game is active show the adapter label
-            label: game ? game.seatLabel(p.seat) : null,
-        })),
+        players: room.players.map(p => ({ id: p.id, name: p.name, label: seatLabelFor(room, p.seat) })),
+    });
+    const broadcastLobby = (room) => io.to(room.id).emit('lobby', serializeLobby(room));
+    const broadcastState = (room) => {
+        const g = getCurrentGame(room); if (!g) return;
+        room.players.forEach(p => {
+            const payload = g.serialize(room, p.id);
+            io.to(p.id).emit('state', payload);
+        });
+    };
+
+    const rateOK = ((max = 30, ms = 2000) => {
+        io.use((socket, next) => { socket.data.rl = { c: 0, t: Date.now() }; next(); });
+        return (socket) => {
+            const now = Date.now(); const rl = socket.data.rl;
+            if (now - rl.t > ms) { rl.t = now; rl.c = 0; }
+            rl.c += 1; return rl.c <= max;
+        };
+    })();
+
+    registerSocketEvents(io, {
+        games,
+        rooms: { getRoom, ensureRoom, ensureHost, maybeDelete, getCurrentGame, broadcastLobby, broadcastState },
+        h: { ok, err, cleanName, isRoomId },
+        rateOK,
+    });
+
+    return {
+        app, io, server,
+        start(port = process.env.PORT || 4000, host = "0.0.0.0") {
+   return new Promise(res => server.listen(port, host, () => res(server)));
+ },
+        stop() {
+            return new Promise(res => io.close(() => server.close(() => res())));
+        },
     };
 }
 
-function broadcastLobby(roomId) {
-    const room = rooms.get(roomId);
-    if (!room) return;
-    io.to(roomId).emit('lobby', serializeLobby(room));
+if (require.main === module) {
+    const srv = createServer();
+    const PORT = process.env.PORT || 4000;
+    srv.start(PORT).then(() =>
+   console.log(`Server listening on http://0.0.0.0:${PORT}`)
+);
 }
 
-function broadcastState(roomId) {
-    const room = rooms.get(roomId);
-    if (!room) return;
-    const game = currentGame(room);
-    if (!game) return;
-    room.players.forEach(p => {
-        const payload = game.serialize(room, p.id);
-        io.to(p.id).emit('state', payload);
-    });
-}
-
-io.on('connection', (socket) => {
-    socket.data.name = `User-${String(socket.id).slice(0, 4)}`;
-
-
-    socket.on('join', ({ roomId, name }, ack) => {
-        if (!roomId) return ack?.({ ok: false, code: 'NO_ROOM_ID' });
-
-        const room = getRoom(roomId) || createRoom(roomId);
-
-        let p = room.players.find(p => p.id === socket.id);
-        if (!p) {
-            p = { id: socket.id, name: name?.trim() || socket.data.name, seat: null };
-            room.players.push(p);
-        } else {
-            p.name = name?.trim() || p.name;
-        }
-
-        ensureHost(room);
-
-        const game = currentGame(room);
-        if (game) game.assignSeats(room);
-
-        socket.data.roomId = roomId;
-        socket.join(roomId);
-
-        ack?.({ ok: true });
-        socket.emit('you', { id: socket.id, host: socket.id === room.hostId });
-
-        broadcastLobby(roomId);
-        if (game) broadcastState(roomId);
-    });
-
-    socket.on('set_name', ({ name }) => {
-        const roomId = socket.data.roomId;
-        if (!roomId) return;
-        const room = getRoom(roomId);
-        if (!room) return;
-
-        const n = (name || '').trim();
-        if (!n) return;
-
-        socket.data.name = n;
-        const p = room.players.find(p => p.id === socket.id);
-        if (p) p.name = n;
-
-        broadcastLobby(roomId);
-        if (room.game) broadcastState(roomId);
-    });
-
-    socket.on('host_choose_game', ({ gameId }, ack) => {
-        const room = getRoom(socket.data.roomId);
-        if (!room) return ack?.({ ok: false, code: 'NO_ROOM' });
-        if (socket.id !== room.hostId) return ack?.({ ok: false, code: 'NOT_HOST' });
-
-        const game = games.get(gameId);
-        if (!game) return ack?.({ ok: false, code: 'UNKNOWN_GAME' });
-
-        if (room.players.length < game.minPlayers) {
-            return ack?.({ ok: false, code: 'NEED_PLAYERS', need: game.minPlayers });
-        }
-
-        game.assignSeats(room);
-        room.phase = `playing:${gameId}`;
-        room.game = { id: gameId, state: game.initState() };
-
-        io.to(room.id).emit('phase', {
-            roomId: room.id,
-            hostId: room.hostId,
-            phase: room.phase,
-            gameId: room.game.id,
-        });
-
-        broadcastState(room.id);
-        ack?.({ ok: true });
-    });
-    socket.on('host_end_game', (ack) => {
-        const room = getRoom(socket.data.roomId);
-        if (!room) return ack?.({ ok: false, code: 'NO_ROOM' });
-        if (socket.id !== room.hostId) return ack?.({ ok: false, code: 'NOT_HOST' });
-
-
-
-        room.phase = `lobby`;
-        room.game = null;
-        room.players.forEach(p => {
-            p.seat = null;
-        });
-
-        io.to(room.id).emit('phase', {
-            roomId: room.id,
-            hostId: room.hostId,
-            phase: room.phase,
-            gameId: null,
-        });
-        broadcastLobby(room.id);
-        ack?.({ ok: true });
-    });
-
-    socket.on('action', (action, ack) => {
-        const room = getRoom(socket.data.roomId);
-        if (!room || !room.game) return ack?.({ ok: false, code: 'NO_GAME' });
-        const game = currentGame(room);
-        if (!game) return ack?.({ ok: false, code: 'UNKNOWN_GAME' });
-
-        const a = { ...action, _by: socket.id };
-
-        const ok = game.canAct ? game.canAct(room, socket, a) : true;
-        if (!ok) return ack?.({ ok: false, code: 'CANNOT_ACT' });
-
-        try {
-            const res = game.reduce(room, a);
-            broadcastState(room.id);
-            return ack?.({ ok: true, res });
-        } catch (err) {
-            console.error('reduce error', err);
-            return ack?.({ ok: false, code: 'REDUCE_ERROR' });
-        }
-    });
-
-    socket.on('reset', (ack) => {
-        const room = getRoom(socket.data.roomId);
-        if (!room || !room.game) return ack?.({ ok: false, code: 'NO_GAME' });
-        const game = currentGame(room);
-        if (!game) return ack?.({ ok: false, code: 'UNKNOWN_GAME' });
-
-        const p = room.players.find(p => p.id === socket.id);
-        if (p.seat == null) return ack?.({ ok: false, code: 'NOT_A_PLAYER' });
-
-        game.assignSeats(room);
-        room.game.state = game.initState();
-        broadcastState(room.id);
-        return ack?.({ ok: true });
-    });
-
-    function removeFromRoom() {
-        const roomId = socket.data.roomId;
-        if (!roomId) return;
-        const room = getRoom(roomId);
-        if (!room) return;
-
-        room.players = room.players.filter(p => p.id !== socket.id);
-
-        ensureHost(room);
-        const game = currentGame(room);
-        if (game) game.assignSeats(room);
-
-        if (room.players.length === 0) {
-            rooms.delete(roomId);
-        } else {
-            broadcastLobby(roomId);
-            if (game) broadcastState(roomId);
-        }
-    }
-
-    socket.on('leave_room', () => {
-        const roomId = socket.data.roomId;
-        socket.leave(roomId);
-        socket.data.roomId = null;
-        removeFromRoom();
-        socket.emit('left');
-    });
-
-    socket.on('disconnect', () => {
-        removeFromRoom();
-    });
-});
-
-app.get('/', (_req, res) => res.send('Lobby server running'));
-const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => console.log(`Server listening on http://localhost:${PORT}`));
+module.exports = { createServer };
