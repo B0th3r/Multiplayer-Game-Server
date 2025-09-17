@@ -51,3 +51,13 @@ body::before {
         opacity: 0;
     }
 }
+@media (orientation: landscape) {
+  [data-board] {
+    max-width: 75vh !important; 
+    width: auto !important;
+    margin-inline: auto !important;
+  }
+
+  [data-board] { padding: 0.5rem !important; }   
+  [data-board] .grid { gap: 0.375rem !important; }
+}

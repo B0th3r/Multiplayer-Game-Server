@@ -7,17 +7,22 @@ const ROWS = 6;
 
 const makeEmptyBoard = () => Array.from({ length: ROWS }, () => Array(COLS).fill(null));
 
-function Disc({ value }) {
-    const base = "mx-auto h-12 w-12 rounded-full border shadow-sm";
-    const color = !value
-        ? "bg-white border-gray-300"
-        : value === "R"
-            ? "bg-red-500 border-red-600"
-            : value === "G"
-                ? "bg-green-500 border-green-600"
-                : "bg-yellow-400 border-yellow-500";
-    return <div className={`${base} ${color}`} />;
+function Disc({ value, small = false }) {
+  const base = small
+    ? "w-10 aspect-square rounded-full border shadow-sm"     // status disc
+    : "w-[75%] h-[75%] rounded-full border shadow-sm";     // board disc
+
+  const color = !value
+    ? "bg-white border-gray-300"
+    : value === "R"
+    ? "bg-red-500 border-red-600"
+    : value === "G"
+    ? "bg-green-500 border-green-600"
+    : "bg-yellow-400 border-yellow-500";
+
+  return <div className={`${base} ${color}`} />;
 }
+
 
 function ColumnHeader({ onClick, disabled }) {
     return (
@@ -57,7 +62,6 @@ export default function ConnectFour() {
 
         const onPhase = ({ phase, roomId: rid }) => {
             if (phase === "lobby") {
-                alert("Host has ended the game")
                 navigate(`/room/${encodeURIComponent(rid)}`, { replace: true });
             }
         };
@@ -104,7 +108,8 @@ export default function ConnectFour() {
 
     return (
         <div className="min-h-screen w-full flex items-center justify-center p-6">
-            <div className="w-full max-w-3xl space-y-4 ">
+            <div data-layout className="w-full max-w-3xl space-y-4 ">
+                <aside data-left className="space-y-3">
                 <header className="flex items-center justify-between ">
                     <h1 className="text-2xl font-bold">Connect Four</h1>
                     <div className="flex items-center gap-2 ">
@@ -118,7 +123,7 @@ export default function ConnectFour() {
                                         : "border-yellow-400"
                                 }`}
                         >
-                            <Disc value={winner ? (winner === "draw" ? null : winner) : myColor} />
+                            <Disc value={winner ? (winner === "draw" ? null : winner) : myColor} small/>
                             <span>{status}</span>
                         </span>
                         <button
@@ -131,7 +136,9 @@ export default function ConnectFour() {
                         </button>
                     </div>
                 </header>
+</aside>
 
+<aside data-right className="space-y-3">
                 <div className="text-sm text-slate-600 flex items-center gap-3">
                     <button
                         onClick={EndGame}>
@@ -142,9 +149,14 @@ export default function ConnectFour() {
                         WS: {conn} • You: {myColor || "—"} • Players: {players.map(p => p.color).join(", ") || "—"}
                     </span>
                 </div>
-
+</aside>
                 <div className="overflow-x-auto ">
-                    <div className="rounded-xl border p-2 shadow-md  bg-slate-700  " role="grid" aria-label="Connect Four board">
+                    <div
+  data-board
+  className="rounded-xl border p-2 shadow-md bg-slate-700"
+  role="grid"
+  aria-label="Connect Four board"
+>
                         <div className="grid grid-cols-7 gap-2 ">
                             {Array.from({ length: COLS }).map((_, c) => (
                                 <ColumnHeader
@@ -162,20 +174,21 @@ export default function ConnectFour() {
                         </div>
 
                         <div className="grid grid-cols-7 gap-2 p-2 rounded-b-xl">
-                            {board.map((row, r) =>
-                                row.map((cell, c) => (
-                                    <button
-                                        key={`${r}-${c}`}
-                                        onClick={() => handleDrop(c)}
-                                        className="aspect-square rounded-xl bg-slate-800 p-2 transition active:scale-[0.98] focus:outline-none focus:ring"
-                                        aria-label={`Row ${r + 1}, Column ${c + 1}`}
-                                        disabled={conn !== "connected" || !myColor || !!winner || current !== myColor}
-                                    >
-                                        <Disc value={cell} />
-                                    </button>
-                                ))
-                            )}
-                        </div>
+  {board.map((row, r) =>
+    row.map((cell, c) => (
+      <button
+        key={`${r}-${c}`}
+        onClick={() => handleDrop(c)}
+        className="aspect-square flex items-center justify-center rounded-xl bg-slate-800 transition active:scale-[0.98] focus:outline-none focus:ring"
+        aria-label={`Row ${r + 1}, Column ${c + 1}`}
+        disabled={conn !== "connected" || !myColor || !!winner || current !== myColor}
+      >
+        <Disc value={cell} />
+      </button>
+    ))
+  )}
+</div>
+
                     </div>
                 </div>
             </div>
