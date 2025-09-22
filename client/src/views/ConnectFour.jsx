@@ -7,7 +7,7 @@ const ROWS = 6;
 
 const makeEmptyBoard = () => Array.from({ length: ROWS }, () => Array(COLS).fill(null));
 
-function Disc({ value, small = false }) {
+function Disc({ value, small = false, highlight = false}) {
   const base = small
     ? "w-10 aspect-square rounded-full border shadow-sm"     // status disc
     : "w-[75%] h-[75%] rounded-full border shadow-sm";     // board disc
@@ -19,8 +19,13 @@ function Disc({ value, small = false }) {
     : value === "G"
     ? "bg-green-500 border-green-600"
     : "bg-yellow-400 border-yellow-500";
-
-  return <div className={`${base} ${color}`} />;
+const glow = highlight
+    ? "ring-offset-slate-800 animate-pulse " +
+      (value === "R"
+        ? "ring-red-600 drop-shadow-[0_0_12px_rgba(239,68,68,0.75)]"
+        : "ring-yellow-600 drop-shadow-[0_0_12px_rgba(250,204,21,0.75)]")
+    : "";
+  return <div className={`${base} ${color} ${glow}`} />;
 }
 
 
@@ -45,6 +50,7 @@ export default function ConnectFour() {
     const [current, setCurrent] = useState("R");
     const [winner, setWinner] = useState(null);
     const [players, setPlayers] = useState([]);
+    const [lastMove, setLastMove] = useState(null);
     useEffect(() => {
         if (conn === "connected" && roomId) {
             socket.emit("join", { roomId });
@@ -58,6 +64,7 @@ export default function ConnectFour() {
             setCurrent(st.current || "R");
             setWinner(st.winner ?? null);
             setPlayers(st.players || []);
+            setLastMove(st.last || null);
         };
 
         const onPhase = ({ phase, roomId: rid }) => {
@@ -183,7 +190,10 @@ export default function ConnectFour() {
         aria-label={`Row ${r + 1}, Column ${c + 1}`}
         disabled={conn !== "connected" || !myColor || !!winner || current !== myColor}
       >
-        <Disc value={cell} />
+        <Disc
+        value={cell}
+        highlight={!!cell && lastMove?.r === r && lastMove?.c === c}
+      />
       </button>
     ))
   )}

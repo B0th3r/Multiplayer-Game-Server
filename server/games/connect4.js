@@ -35,10 +35,11 @@ const connect4 = {
 
     serialize(room) {
         const st = room.game.state;
+        const last = st.history.length ? st.history[st.history.length - 1] : null;
         return {
             board: st.board,
             current: this.seatLabel(st.currentSeat),
-            winner: st.winner,
+            winner: st.winner,last,
             players: room.players.map(p => ({
                 id: p.id,
                 name: p.name,
@@ -65,7 +66,7 @@ const connect4 = {
         const color = this.seatLabel(st.currentSeat);
         st.board[r][col] = color;
         st.history.push({ r, c: col, color });
-
+        st.last = { r, c: col, color };
         const w = checkWinner(st.board);
         st.winner = w;
         if (!st.winner) st.currentSeat = st.currentSeat === 0 ? 1 : 0;
