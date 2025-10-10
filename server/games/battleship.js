@@ -168,8 +168,8 @@ const battleship = {
         };
     },
 
-    canAct(room, socket, action) {
-        const me = room.players.find(p => p.id === socket.id);
+    canAct(room, userId, action) {
+        const me = room.players.find(p => p.id === userId);
         if (!me || me.seat == null) return false;
         const st = room.game.state;
 

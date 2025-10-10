@@ -41,11 +41,11 @@ const tictactoe = {
         };
     },
 
-    canAct(room, socket, action) {
+    canAct(room, userId, action) {
         if (room.phase !== `playing:${this.id}`) return false;
         if (!action || action.type !== 'place') return false;
 
-        const me = room.players.find(p => p.id === socket.id);
+        const me = room.players.find(p => p.id === userId);
         if (!me || me.seat == null) return false;                 // spectators can't play
 
         const st = room.game.state;

@@ -11,24 +11,24 @@ function createServer({ injectedGames } = {}) {
     const app = express();
     const server = http.createServer(app);
     const parseOrigins = (s) =>
-  new Set((s || '').split(',').map(o => o.trim()).filter(Boolean));
-const ALLOWED_ORIGINS = parseOrigins(process.env.CORS_ORIGINS);
-const originOK = (origin) => !origin || ALLOWED_ORIGINS.has(origin);
+        new Set((s || '').split(',').map(o => o.trim()).filter(Boolean));
+    const ALLOWED_ORIGINS = parseOrigins(process.env.CORS_ORIGINS);
+    const originOK = (origin) => !origin || ALLOWED_ORIGINS.has(origin);
 
-const io = new Server(server, {
-  cors: {
-    origin: (origin, cb) => originOK(origin) ? cb(null, true) : cb(new Error('CORS: origin not allowed')),
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: !!process.env.CORS_CREDENTIALS,
-    maxAge: 86400,
-  },
-});
-io.use((socket, next) => {
-  const origin = socket.handshake.headers.origin;
-  if (!originOK(origin)) return next(new Error('Origin blocked'));
-  next();
-});
+    const io = new Server(server, {
+        cors: {
+            origin: (origin, cb) => originOK(origin) ? cb(null, true) : cb(new Error('CORS: origin not allowed')),
+            methods: ['GET', 'POST'],
+            allowedHeaders: ['Content-Type', 'Authorization'],
+            credentials: !!process.env.CORS_CREDENTIALS,
+            maxAge: 86400,
+        },
+    });
+    io.use((socket, next) => {
+        const origin = socket.handshake.headers.origin;
+        if (!originOK(origin)) return next(new Error('Origin blocked'));
+        next();
+    });
     const MAX_NAME = 32;
     const reply = (ack, p) => typeof ack === 'function' && ack(p);
     const ok = (ack, extra = {}) => reply(ack, { ok: true, ...extra });
@@ -72,7 +72,7 @@ io.use((socket, next) => {
             io.to(p.id).emit('state', payload);
         });
     };
-
+    const listRooms = () => Array.from(roomsMap.values());
     const rateOK = ((max = 30, ms = 2000) => {
         io.use((socket, next) => { socket.data.rl = { c: 0, t: Date.now() }; next(); });
         return (socket) => {
@@ -84,7 +84,7 @@ io.use((socket, next) => {
 
     registerSocketEvents(io, {
         games,
-        rooms: { getRoom, ensureRoom, ensureHost, maybeDelete, getCurrentGame, broadcastLobby, broadcastState },
+        rooms: { getRoom, ensureRoom, ensureHost, maybeDelete, getCurrentGame, broadcastLobby, broadcastState, listRooms, },
         h: { ok, err, cleanName, isRoomId },
         rateOK,
     });
@@ -92,8 +92,8 @@ io.use((socket, next) => {
     return {
         app, io, server,
         start(port = process.env.PORT || 4000, host = "0.0.0.0") {
-   return new Promise(res => server.listen(port, host, () => res(server)));
- },
+            return new Promise(res => server.listen(port, host, () => res(server)));
+        },
         stop() {
             return new Promise(res => io.close(() => server.close(() => res())));
         },
@@ -104,8 +104,8 @@ if (require.main === module) {
     const srv = createServer();
     const PORT = process.env.PORT || 4000;
     srv.start(PORT).then(() =>
-   console.log(`Server listening on http://0.0.0.0:${PORT}`)
-);
+        console.log(`Server listening on http://0.0.0.0:${PORT}`)
+    );
 }
 
 module.exports = { createServer };

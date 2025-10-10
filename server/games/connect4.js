@@ -39,7 +39,8 @@ const connect4 = {
         return {
             board: st.board,
             current: this.seatLabel(st.currentSeat),
-            winner: st.winner,last,
+            winner: st.winner,
+    last,
             players: room.players.map(p => ({
                 id: p.id,
                 name: p.name,
@@ -48,10 +49,11 @@ const connect4 = {
         };
     },
 
-    canAct(room, socket, action) {
+    canAct(room, userId, action) {
         if (room.phase !== `playing:${this.id}`) return false;
-        const p = room.players.find(p => p.id === socket.id);
-        if (!p || p.seat == null) return false;
+       const p = room.players.find(p => p.id === userId);
+  if (!p || p.seat == null) return false;
+    
         const st = room.game.state;
         if (st.winner) return false;
         return p.seat === st.currentSeat && action.type === 'drop' && typeof action.col === 'number';
