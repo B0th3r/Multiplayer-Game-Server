@@ -165,7 +165,6 @@ export default function RoomEntry() {
                         />
                     </label>
 
-                    {/* Tabs */}
                     <div className="flex items-center gap-2 border-b border-emerald-800/30 pb-2">
                         <TabButton active={tab === "browse"} onClick={() => setTab("browse")}>Browse Lobbies</TabButton>
                         <TabButton active={tab === "create"} onClick={() => setTab("create")}>Create Lobby</TabButton>
