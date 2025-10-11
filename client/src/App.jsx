@@ -1,33 +1,41 @@
-import { Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { Routes, Route, Navigate, Outlet } from "react-router-dom"; 
 import RoomEntry from "./views/RoomEntry.jsx";
 import Lobby from "./views/Lobby.jsx";
 import ConnectFour from "./views/ConnectFour.jsx";
 import TicTacToe from "./views/TicTacToe.jsx";
 import Battleship from "./views/Battleship.jsx";
-
 function AppShell() {
-    return (
-        <div className="min-h-screen flex flex-col bg-black text-green-300 font-mono selection:bg-green-600/20">
-            <header className="sticky top-0 z-50 px-4 py-3 border-b border-green-700/30 bg-black/80 backdrop-blur-sm">
-                <div className="max-w-5xl mx-auto flex items-center justify-between">
-                    <span className="tracking-wider animate-pulse">BOB'S ARCADE</span>
-                    <span className="text-xs text-green-500/70">v1.0</span>
-                </div>
-            </header>
+  return (
+    <div className="relative min-h-dvh flex flex-col text-green-300 font-mono">
 
-            <main className="flex-1 max-w-5xl mx-auto p-4 sm:p-6">
-                <Outlet />
-            </main>
+      <div
+        aria-hidden
+        className="fixed inset-0 -z-10 bg-black"
+      />
 
-            <footer className="sticky bottom-0 z-50 px-4 py-2 border-t border-green-700/30 bg-black/80 backdrop-blur-sm">
-                <div className="max-w-5xl mx-auto flex items-center justify-between text-xs">
-                    <span className="text-green-500/70">© 2025 Keshawn Bryant</span>
-                    <span className="tracking-widest">[PRESS START]</span>
-                </div>
-            </footer>
+      <header className="fixed inset-x-0 top-0 h-12 md:sticky md:top-0 z-50 border-b border-green-700/30 supports-[backdrop-filter]:bg-black/80 bg-black/90 backdrop-blur-sm [padding-top:env(safe-area-inset-top)]">
+        <div className="max-w-5xl mx-auto h-full px-4 flex items-center justify-between">
+          <span className="tracking-wider animate-pulse">BOB'S ARCADE</span>
+          <span className="text-xs text-green-500/70">v2.0</span>
         </div>
-    );
+      </header>
+
+      <main className="flex-1 max-w-5xl mx-auto px-4 sm:px-6
+                       pt-12 md:pt-4
+                       pb-10 md:pb-4">
+        <Outlet />
+      </main>
+      <footer className="fixed inset-x-0 bottom-0 h-10 md:sticky md:bottom-0 z-50 border-t border-green-700/30 supports-[backdrop-filter]:bg-black/80 bg-black/90 backdrop-blur-sm [padding-bottom:env(safe-area-inset-bottom)]">
+        <div className="max-w-5xl mx-auto h-full px-4 flex items-center justify-between text-xs">
+          <span className="text-green-500/70">© 2025 Keshawn Bryant</span>
+          <span className="tracking-widest">[PRESS START]</span>
+        </div>
+      </footer>
+    </div>
+  );
 }
+
+
 
 export default function App() {
     return (
