@@ -4,6 +4,9 @@ import Lobby from "./views/Lobby.jsx";
 import ConnectFour from "./views/ConnectFour.jsx";
 import TicTacToe from "./views/TicTacToe.jsx";
 import Battleship from "./views/Battleship.jsx";
+import Blackjack from "./views/Blackjack.jsx";  
+import MemoryMatching from "./views/MemoryMatching.jsx";
+import Riichi from "./views/Riichi.jsx";
 function AppShell() {
   return (
     <div className="relative min-h-dvh flex flex-col text-green-300 font-mono">
@@ -46,6 +49,9 @@ export default function App() {
                 <Route path="/connect4/:roomId" element={<ConnectFour />} />
                 <Route path="/TicTacToe/:roomId" element={<TicTacToe />} />
                 <Route path="/Battleship/:roomId" element={<Battleship />} />
+                <Route path="/Blackjack/:roomId" element={<Blackjack />} />
+                <Route path="/MemoryMatching/:roomId" element={<MemoryMatching />} />
+                <Route path="/Riichi/:roomId" element={<Riichi />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
         </Routes>

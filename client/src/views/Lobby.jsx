@@ -164,6 +164,24 @@ export default function Lobby() {
                                 onClick={() => startGame("battleship")}
                                 disabled={!isReady}
                             />
+                            <GameCard
+                                title="Blackjack"
+                                icon={<Gamepad2 className="h-5 w-5" />}
+                                onClick={() => startGame("blackjack")}
+                                disabled={!isReady}
+                            />
+                            <GameCard
+                                title="Memory Matching"
+                                icon={<Gamepad2 className="h-5 w-5" />}
+                                onClick={() => startGame("memoryMatching")}
+                                disabled={!isReady}
+                            />
+                            <GameCard
+                            title="Riichi Mahjong"
+                            icon={<Gamepad2 className="h-5 w-5" />}
+                            onClick={() => startGame("riichi")}
+                            disabled={!isReady}
+                            ></GameCard>
                         </div>
                         {!isReady && (
                             <p className="text-xs text-emerald-300/70">

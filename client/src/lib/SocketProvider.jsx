@@ -8,7 +8,7 @@ let uid = localStorage.getItem("user_id");
     localStorage.setItem("user_id", uid);
   }
 export function SocketProvider({ children }) {
-    const [socket] = useState(() => io(import.meta.env.VITE_WS_URL || "http://192.168.1.206:4000/", { autoConnect: true, auth: { userId: uid }, }));
+    const [socket] = useState(() => io(import.meta.env.VITE_WS_URL || "http://localhost:4000", { autoConnect: true, auth: { userId: uid }, }));
     const [conn, setConn] = useState(socket.connected ? "connected" : "disconnected");
     const [you, setYou] = useState(null);
  
