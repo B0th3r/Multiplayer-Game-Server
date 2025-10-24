@@ -63,7 +63,11 @@ function occupiedSeatIndices(room) {
 
 function firstActingSeat(st, room) {
     const occ = occupiedSeatIndices(room);
-    for (const i of occ) if (st.seats[i] && st.seats[i].bet > 0) return i;
+    for (const i of occ) {
+        const s = st.seats[i];
+        if (!s) continue;
+        if (s.bet > 0 && !s.done && !s.bust) return i;
+    }
     return null;
 }
 
@@ -75,6 +79,43 @@ function everyoneDone(st, room) {
         if (!s.done) return false;
     }
     return true;
+}
+
+function evaluateMatchWin(st, room) {
+    if (!st.goal || !st.goal.enabled) return;
+
+    const occ = occupiedSeatIndices(room);
+    const eligible = occ.filter(i => st.seats[i]);
+    if (eligible.length === 0) return;
+
+    const reached = eligible.filter(i => st.seats[i].chips >= st.goal.targetChips);
+    if (reached.length) {
+        let best = reached[0];
+        for (const i of reached) {
+            if (st.seats[i].chips > st.seats[best].chips) best = i;
+        }
+        st.goal.winnerSeat = best;
+        st.goal.reason = "TARGET_REACHED";
+        return;
+    }
+
+    const alive = eligible.filter(i => st.seats[i].chips >= MIN_BET);
+    if (alive.length === 1) {
+        st.goal.winnerSeat = alive[0];
+        st.goal.reason = "LAST_STANDING";
+        return;
+    }
+
+    // if nobody can afford MIN_BET highest chips wins
+    if (alive.length === 0) {
+        let best = eligible[0];
+        for (const i of eligible) {
+            if (st.seats[i].chips > st.seats[best].chips) best = i;
+        }
+        st.goal.winnerSeat = best;
+        st.goal.reason = "HIGHEST_CHIPS";
+        return;
+    }
 }
 
 function settle(st, room) {
@@ -113,7 +154,7 @@ function settle(st, room) {
         } else if (pVal < dealerVal) {
             payout = 0;
         } else {
-            payout = s.bet; 
+            payout = s.bet;
         }
 
         s.chips += payout;
@@ -131,6 +172,9 @@ function settle(st, room) {
     st.revealEndsAt = Date.now() + REVEAL_MS;
     st.currentSeat = null;
     st.last = { type: "settle" };
+    if (st.goal && st.goal.enabled) {
+        evaluateMatchWin(st, room);
+    }
 }
 
 function dealInitial(st, room) {
@@ -172,6 +216,12 @@ const blackjack = {
             round: 1,
             last: null,
             revealEndsAt: null,
+            goal: {
+                enabled: true,         // turn off to play endless regular blackjack
+                targetChips: 5000,
+                winnerSeat: null,
+                reason: null
+            },
         };
     },
 
@@ -191,9 +241,18 @@ const blackjack = {
                 stood: s.stood,
                 done: s.done,
                 doubled: s.doubled,
+                eliminated: st.phase === "betting"
+                    ? (s.bet === 0 && s.chips < MIN_BET)   // only if they can't post a bet now
+                    : false,
+
             };
         });
-
+        const goal = st.goal ? {
+            enabled: !!st.goal.enabled,
+            targetChips: st.goal.targetChips,
+            winner: st.goal.winnerSeat != null ? this.seatLabel(st.goal.winnerSeat) : null,
+            reason: st.goal.reason || null,
+        } : null;
         const dealer = {
             hand: st.dealer.hand.map((c, idx) =>
                 (st.phase === "acting" && idx === 1)
@@ -213,6 +272,7 @@ const blackjack = {
             last: st.last,
             round: st.round,
             revealEndsAt: st.phase === "reveal" ? st.revealEndsAt : null,
+            goal,
         };
     },
 
@@ -247,7 +307,11 @@ const blackjack = {
             if (action.type !== "next_round") return false;
             return Date.now() >= (st.revealEndsAt || 0);
         }
-       
+
+        if (st.phase === "match_over") {
+            return action.type === "reset_match";
+        }
+
         return false;
     },
 
@@ -265,7 +329,7 @@ const blackjack = {
                     st.last = { type: "sit_out", seat: seatIdx };
                     return;
                 }
-                if (amt < MIN_BET || amt > s.chips) return; 
+                if (amt < MIN_BET || amt > s.chips) return;
                 s.chips -= amt; s.bet = amt; s.hand = []; s.bust = s.stood = s.done = s.doubled = false;
                 st.last = { type: "bet", seat: seatIdx, amount: amt };
                 return;
@@ -323,7 +387,13 @@ const blackjack = {
 
         if (st.phase === "reveal" && action.type === "next_round") {
             if (Date.now() < (st.revealEndsAt || 0)) return; // still revealing
-
+            if (st.goal?.enabled && st.goal.winnerSeat != null) {
+                st.phase = "match_over";
+                st.currentSeat = null;
+                st.revealEndsAt = null;
+                st.last = { type: "match_over", seat: st.goal.winnerSeat, reason: st.goal.reason };
+                return;
+            }
             for (const s of st.seats) {
                 if (!s) continue;
                 s.hand = [];
@@ -341,10 +411,29 @@ const blackjack = {
             st.last = { type: "next_round", round: st.round };
             return;
         }
+        if (st.phase === "match_over" && action.type === "reset_match") {
+            for (let i = 0; i < st.seats.length; i++) {
+                const s = st.seats[i];
+                if (!s) continue;
+                st.seats[i] = { chips: 1000, bet: 0, hand: [], stood: false, bust: false, done: false, doubled: false };
+            }
+            st.shoe = newShoe();
+            st.discard = [];
+            st.dealer = { hand: [], bust: false };
+            st.currentSeat = null;
+            st.round = 1;
+            st.revealEndsAt = null;
+            st.goal.winnerSeat = null;
+            st.goal.reason = null;
+            st.phase = "betting";
+            st.last = { type: "reset_match" };
+            return;
+        }
+
     },
 
     isTerminal(room) {
-        return false;
+        return room.game.state.phase === "match_over";
     },
 };
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSocket } from "../lib/SocketProvider.jsx";
 import { PlugZap, RefreshCw, HandMetal, DollarSign, ChevronRight, Hourglass } from "lucide-react";
@@ -38,7 +38,7 @@ export default function Blackjack() {
     const { roomId } = useParams();
     const navigate = useNavigate();
     const { socket, conn, you } = useSocket();
-
+    const [goal, setGoal] = useState(null);
     const [phase, setPhase] = useState("betting");
     const [current, setCurrent] = useState(null);
     const [players, setPlayers] = useState([]);
@@ -57,9 +57,10 @@ export default function Blackjack() {
 
     const [betAmt, setBetAmt] = useState(10);
 
-    useEffect(() => { if (conn === "connected" && roomId)
-         socket.emit("join", { roomId });
-        }, [conn, roomId, socket]);
+    useEffect(() => {
+        if (conn === "connected" && roomId)
+            socket.emit("join", { roomId });
+    }, [conn, roomId, socket]);
 
     useEffect(() => {
         const onState = (st) => {
@@ -71,6 +72,7 @@ export default function Blackjack() {
             setRound(st.round || 1);
             setLast(st.last || null);
             setRevealEndsAt(st.revealEndsAt || null);
+            setGoal(st.goal || null);
             if (st.phase === "reveal") setNow(Date.now());
         };
         const onPhase = ({ phase, roomId: rid }) => { if (phase === "lobby") navigate(`/room/${encodeURIComponent(rid)}`, { replace: true }); };
@@ -84,6 +86,13 @@ export default function Blackjack() {
         const id = setInterval(() => setNow(Date.now()), 200);
         return () => clearInterval(id);
     }, [phase]);
+    const displayNameForSeat = useCallback((label) => {
+        const p = players.find(x => x?.seat === label);
+        const name = p?.name?.trim();
+        if (name) return name;
+        if (p?.id) return p.id.slice(0, 6);
+        return label;
+    }, [players]);
 
     const myLabel = useMemo(() => {
         if (!you?.id) return null;
@@ -99,23 +108,35 @@ export default function Blackjack() {
     const me = mySeatIdx != null ? seats?.[mySeatIdx] : null;
     const myTurn = current && myLabel && current === myLabel && phase === "acting" && me && !me.done;
 
-    const placeBet = () => 
-        { if (conn === "connected") 
+    const placeBet = () => {
+        if (conn === "connected")
             socket.emit("action", { type: "bet", amount: betAmt });
-        };
+    };
     const startDeal = () => socket.emit("action", { type: "deal" });
+    const resetMatch = () => socket.emit("action", { type: "reset_match" });
     const hit = () => socket.emit("action", { type: "hit" });
     const stand = () => socket.emit("action", { type: "stand" });
     const dbl = () => socket.emit("action", { type: "double" });
     const nextRound = () => socket.emit("action", { type: "next_round" });
     const reset = () => socket.emit("reset");
+    const matchOver = phase === "match_over";
+    const targetChips = goal?.enabled ? goal?.targetChips : null;
+    const winnerSeatLabel = goal?.winner || null;
+    const winnerName = winnerSeatLabel ? (() => {
+        return players.find(p => p?.seat === winnerSeatLabel)?.name || winnerSeatLabel;
+    })() : null;
+
+    const reasonText = goal?.reason === "TARGET_REACHED" ? "target reached"
+        : goal?.reason === "LAST_STANDING" ? "last one standing"
+            : goal?.reason === "HIGHEST_CHIPS" ? "highest chips"
+                : null;
 
     const endGame = () => {
         if (!confirm("Return to lobby?")) return;
         socket.emit("host_end_game", (resp) => { if (!resp?.ok) alert(resp?.code || "Could not end"); });
     };
 
-    const shareText = `Room: ${roomId} • You: ${myLabel || "—"} • Round ${round}`;
+    const shareText = `Room: ${roomId} • You: ${myLabel ? displayNameForSeat(myLabel) : "—"} • Round ${round}`;
 
     return (
         <div className="min-h-screen supports-[height:100svh]:min-h-[100svh] w-full relative overflow-hidden">
@@ -136,21 +157,30 @@ export default function Blackjack() {
                     {/* Status Bar */}
                     <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-700/40 bg-black/40 p-3">
                         <div className="text-emerald-100 text-sm">
-                            {phase === "betting" && (<>Place bets to start the round.</>)}
-                            {phase === "acting" && (<>Turn: <span className="font-semibold">{current}</span></>)}
-                            {phase === "reveal" && (
+                            {matchOver ? (
+                                <>
+                                    <span className="font-semibold">Match Over.</span>{" "}
+                                    {winnerName ? <>Winner: <span className="font-semibold">{winnerName}</span>{reasonText ? ` (${reasonText})` : ""}.</> : null}
+                                </>
+                            ) : phase === "betting" ? (
+                                <>Place bets to start the round.</>
+                            ) : phase === "acting" ? (
+                                <>Turn: <span className="font-semibold">{displayNameForSeat(current)}</span></>
+                            ) : phase === "reveal" ? (
                                 <span className="inline-flex items-center gap-2">
                                     <Hourglass className="h-4 w-4" />
                                     Revealing results… {secsLeft > 0 ? <span className="opacity-80">(Next in {secsLeft}s)</span> : <span className="opacity-80">(Ready)</span>}
                                 </span>
-                            )}
+                            ) : null}
                         </div>
+
                         <div className="text-[11px] text-emerald-300/70 truncate" title={shareText}>{shareText}</div>
                     </div>
 
                     {/* Dealer */}
                     <div className="rounded-xl border border-emerald-700/40 bg-slate-800 p-4">
                         <div className="text-emerald-200 text-sm mb-2">Dealer</div>
+                        <div className="text-red-200 text-sm mb-2">Target chips: {goal?.enabled && targetChips}</div>
                         <div className="flex items-center justify-between">
                             <Stack hand={dealer?.hand || []} />
                             {dealer?.value != null && (
@@ -161,19 +191,35 @@ export default function Blackjack() {
 
                     {/* Seats */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {seats?.map((s, i) => (
-                            <div key={i} className={`rounded-xl border p-3 ${current === `P${i + 1}` && phase === 'acting' ? 'border-emerald-400 bg-emerald-600/10' : 'border-emerald-700/40 bg-slate-800'}`}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="text-emerald-100 text-sm font-semibold">P{i + 1}</div>
-                                    <div className="text-xs text-emerald-300/80">Chips: {s?.chips ?? 0}</div>
+                        {seats?.map((s, i) => {
+                            const seatLabel = `P${i + 1}`;
+                            const isTurn = current === seatLabel && phase === 'acting';
+                            const cardClass = `rounded-xl border p-3 ${isTurn ? 'border-emerald-400 bg-emerald-600/10' : 'border-emerald-700/40 bg-slate-800'
+                                } ${s?.eliminated ? 'opacity-60' : ''}`;
+
+                            return (
+                                <div key={i} className={cardClass}>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="text-emerald-100 text-sm font-semibold flex items-center gap-2">
+                                            {displayNameForSeat(seatLabel)}
+                                            {s?.eliminated && (
+                                                <span className="text-[10px] rounded-full border border-rose-500/40 text-rose-300 px-2 py-0.5">
+                                                    ELIMINATED
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="text-xs text-emerald-300/80">Chips: {s?.chips ?? 0}</div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="text-xs text-emerald-200">Bet: {s?.bet ?? 0}</div>
+                                        <div className="text-xs text-emerald-200">{s?.bust ? 'BUST' : `Value: ${s?.value ?? '-'}`}</div>
+                                    </div>
+                                    <Stack hand={s?.hand || []} />
                                 </div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="text-xs text-emerald-200">Bet: {s?.bet ?? 0}</div>
-                                    <div className="text-xs text-emerald-200">{s?.bust ? 'BUST' : `Value: ${s?.value ?? '-'}`}</div>
-                                </div>
-                                <Stack hand={s?.hand || []} />
-                            </div>
-                        ))}
+                            );
+                        })}
+
                     </div>
 
                     {/* Controls */}
@@ -222,6 +268,29 @@ export default function Blackjack() {
                                 )}
                             </div>
                         )}
+                        {matchOver && (
+                            <div className="rounded-xl border border-emerald-700/40 bg-black/40 p-3 space-y-2">
+                                <div className="text-emerald-100 text-sm">
+                                    {winnerName ? <>Winner: <span className="font-semibold">{winnerName}</span>{reasonText ? ` (${reasonText})` : ""}.</> : "Match over."}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={resetMatch}
+                                        className="inline-flex items-center gap-2 rounded border border-emerald-700/60 px-3 py-2 text-xs text-emerald-200 hover:bg-emerald-600/10"
+                                        title="Start a fresh match with new stacks"
+                                    >
+                                        New Match
+                                    </button>
+                                    <button
+                                        onClick={endGame}
+                                        className="inline-flex items-center gap-2 rounded border border-emerald-700/60 px-3 py-2 text-xs text-emerald-200 hover:bg-emerald-600/10"
+                                    >
+                                        Return to Lobby
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                     </div>
                 </div>
             </div>
