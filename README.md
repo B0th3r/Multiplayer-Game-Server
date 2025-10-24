@@ -15,7 +15,7 @@ Play classics like **Tic-Tac-Toe, Connect Four, and Battleship** with live rooms
 
 - **Real-time gameplay** via WebSockets (Socket.IO)  
 - **Game lobby system** with host/room management  
-- **Multiple games built in** (Tic-Tac-Toe, Connect Four, Battleship)  
+- **Multiple games built in** (MemoryMatching, Blackjack, Mahjong, Tic-Tac-Toe, Connect Four, Battleship)  
 - **Spectator mode** for watching live games  
 - **Modular game API** — easily add new games  
 
@@ -23,11 +23,17 @@ Play classics like **Tic-Tac-Toe, Connect Four, and Battleship** with live rooms
 
 ## Demo
 
-![Lobby Screenshot](docs/lobby.png)  
-*Retro lobby with room creation/join flow*  
+![Room Entry Screenshot](docs/lobbyJoin.png)  
+*Room creation/join flow*
 
-![Gameplay Screenshot](docs/gameplay.png)  
+![Lobby Screenshot](docs/lobby.png)  
+*Retro lobby*  
+
+![Gameplay Screenshot](docs/gameplayConnect4.png)  
 *Real-time Connect Four match in progress*  
+
+![Gameplay Screenshot](docs/gameplayMatching.png)  
+*Memory matching game in progress*  
 
 ---
 
@@ -104,14 +110,6 @@ Server → Client
 
 - **In-memory state only** (rooms reset on server restart)  
 - **No user accounts** — names are temporary and not enforced unique   
-
----
-
-## Releases
-
-- **v1.0.0** – Initial release with Tic-Tac-Toe, Connect Four, Battleship, lobby system.  
-
-See [Releases](https://github.com/B0th3r/Multiplayer-Game-Server/releases) for details.  
 
 ---
 
