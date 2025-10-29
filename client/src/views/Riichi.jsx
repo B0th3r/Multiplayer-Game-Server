@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSocket } from "../lib/SocketProvider.jsx";
 import Tile from "../components/Tile.jsx";
@@ -79,6 +79,26 @@ export default function RiichiMVP() {
     if (!you?.id) return null;
     return players.find(p => p.id === you.id)?.color ?? null;
   }, [players, you?.id]);
+  const seatLabel = (i) => `P${i + 1}`;
+  const labelToIndex = (label) => {
+    if (typeof label !== "string") return null;
+    const m = /^P(\d+)$/.exec(label.trim());
+    return m ? Number(m[1]) - 1 : null;
+  };
+  const displayNameFor = useCallback((seatOrLabel) => {
+    const idx = typeof seatOrLabel === "number" ? seatOrLabel : labelToIndex(seatOrLabel);
+    if (idx == null || idx < 0) return String(seatOrLabel ?? "");
+    const label = seatLabel(idx);
+
+    const p = players.find(x =>
+      x?.color === label || x?.seat === idx || x?.seat === label
+    );
+
+    const name = p?.name?.trim();
+    if (name) return name;
+    if (p?.id) return p.id.slice(0, 6);
+    return label;
+  }, [players]);
   const mySeatIdx = useMemo(() => {
     if (meSeat != null) return meSeat;
     if (!myLabel) return null;
@@ -118,7 +138,13 @@ export default function RiichiMVP() {
 
           {/* Top info */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-700/40 bg-black/40 p-3 text-emerald-100 text-sm">
-            <div>Turn: <span className="font-semibold">{current}</span> • Dealer: {dealer} • Dora: {doraIndicator ? `${doraIndicator} → ${doraActual}` : '—'} • Riichi sticks: {riichiSticks}</div>
+            <div>
+              Turn: <span className="font-semibold">{displayNameFor(current)}</span>
+              • Dealer: {dealer}
+              • Dora: {doraIndicator ? `${doraIndicator} → ${doraActual}` : '—'}
+              • Riichi sticks: {riichiSticks}
+            </div>
+
             <div>Round {round}</div>
           </div>
 
@@ -127,16 +153,21 @@ export default function RiichiMVP() {
             {activeSeats.map((seatIndex) => (
               <div key={seatIndex} className={`rounded-xl border p-3 ${current === `P${seatIndex + 1}` && phase === 'playing' ? 'border-emerald-400 bg-emerald-600/10' : 'border-emerald-700/40 bg-slate-800'}`}>
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-emerald-100 text-sm font-semibold">P{seatIndex + 1} {riichi?.[seatIndex] ? '(Riichi)' : ''} {furiten?.[seatIndex] ? '• Furiten' : ''}</div>
+                  <div className="text-emerald-100 text-sm font-semibold">
+                    {displayNameFor(seatIndex)} 
+                    <span className="ml-2 text-emerald-300/70">({seatLabel(seatIndex)})</span>
+                    {riichi?.[seatIndex] ? ' (Riichi)' : ''} {furiten?.[seatIndex] ? '• Furiten' : ''}
+                  </div>
+
                   <div className="text-xs text-emerald-300/80">Points: {points?.[seatIndex] ?? 0}</div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {(rivers?.[seatIndex] ?? []).map((t, i) => (
                     <Tile
                       key={i}
-                      index={toIndex(t)} 
+                      index={toIndex(t)}
                       masked={false}       // public
-                      size={40}          
+                      size={40}
                     />
                   ))}
 
@@ -149,13 +180,15 @@ export default function RiichiMVP() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {activeSeats.map((seatIndex) => (
               <div key={seatIndex} className="rounded-xl border border-emerald-700/40 bg-slate-800 p-3">
-                <div className="text-emerald-100 text-sm font-semibold mb-2">Hand P{seatIndex + 1} {seatIndex === mySeatIdx ? '(You)' : ''}</div>
+                <div className="text-emerald-100 text-sm font-semibold mb-2">
+                  {displayNameFor(seatIndex)} <span className="text-emerald-300/70">({seatLabel(seatIndex)})</span> {seatIndex === mySeatIdx ? '(You)' : ''}
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {(hands?.[seatIndex] ?? []).map((idx, i) => (
                     <Tile
                       key={i}
                       index={toIndex(idx)}
-                      masked={seatIndex !== mySeatIdx}    
+                      masked={seatIndex !== mySeatIdx}
                       onClick={() => (myTurn && seatIndex === mySeatIdx) ? discard(i) : undefined}
                       size={48}
                     />

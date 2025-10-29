@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useCallback, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSocket } from "../lib/SocketProvider.jsx";
 import { PlugZap, RefreshCw, Brain, ArrowRightCircle } from "lucide-react";
@@ -100,10 +100,16 @@ export default function Memory() {
       autoNextTimeoutRef.current = null;
     };
   }, [autoNextAt, socket]);
-
+  const displayNameForSeat = useCallback((label) => {
+    const p = players.find(x => x?.seat === label);
+    const name = p?.name?.trim();
+    if (name) return name;
+    if (p?.id) return p.id.slice(0, 6);
+    return label;
+  }, [players]);
   const myLabel = useMemo(() => {
     if (!you?.id) return null;
-    return players.find(p => p.id === you.id)?.seat ?? null; // server seatLabel used in color
+    return players.find(p => p.id === you.id)?.seat ?? null; 
   }, [players, you?.id]);
 
   const mySeatIdx = useMemo(() => {
@@ -147,7 +153,7 @@ export default function Memory() {
         <div className="w-full max-w-4xl space-y-4 p-6 sm:p-8 rounded-2xl border border-emerald-500/30 bg-black/60 shadow-[0_0_0_1px_rgba(16,185,129,0.08)_inset,0_10px_40px_-12px_rgba(16,185,129,0.15)] backdrop-blur">
           {/* Header */}
           <div className="flex items-center justify-between">
-            <h1 className="mt-1 text-2xl font-semibold tracking-wider text-emerald-300 flex items-center gap-2"><Brain className="h-5 w-5"/> MEMORY</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-wider text-emerald-300 flex items-center gap-2"><Brain className="h-5 w-5" /> MEMORY</h1>
             <div className="flex items-center gap-2">
               <StatusPill conn={conn} text={`WS: ${conn} · Players: ${players.length}`} />
               <button onClick={endGame} className="inline-flex items-center gap-2 rounded border border-emerald-700/60 px-3 py-2 text-xs text-emerald-200 hover:bg-emerald-600/10">End game</button>
@@ -158,7 +164,7 @@ export default function Memory() {
           {/* Status Bar */}
           <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-700/40 bg-black/40 p-3">
             <div className="text-emerald-100 text-sm">
-              {phase === "playing" && (<>Turn: <span className="font-semibold">{current}</span>. Flip two cards.</>)}
+              {phase === "playing" && (<>Turn: <span className="font-semibold">{displayNameForSeat(current)}</span>. Flip two cards.</>)}
               {phase === "reveal" && (
                 <>Review the pair, then continue.{" "}
                   {autoNextAt && <span className="opacity-80">Auto-continue in {secsLeft}s…</span>}
@@ -171,12 +177,27 @@ export default function Memory() {
 
           {/* Scoreboard */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[0,1,2,3].map(i => (
-              <div key={i} className={`rounded-xl border p-2 ${current === `P${i+1}` && phase === 'playing' ? 'border-emerald-400 bg-emerald-600/10' : 'border-emerald-700/40 bg-slate-800'}`}>
-                <div className="text-emerald-100 text-sm font-semibold">P{i+1}</div>
-                <div className="text-xs text-emerald-300/80">Score: {scores?.[i] ?? 0}</div>
-              </div>
-            ))}
+            {(players?.length ? players.map(p => p.seat)
+              : Array.from({ length: Math.max(4, scores?.length || 0) }, (_, i) => `P${i + 1}`))
+              .map((label) => {
+                const i = Math.max(0, parseInt(label.slice(1), 10) - 1);
+                return (
+                  <div
+                    key={label}
+                    className={`rounded-xl border p-2 ${current === label && phase === 'playing'
+                        ? 'border-emerald-400 bg-emerald-600/10'
+                        : 'border-emerald-700/40 bg-slate-800'
+                      }`}
+                  >
+                    <div className="text-emerald-100 text-sm font-semibold">
+                      {displayNameForSeat(label)}
+                    </div>
+                    <div className="text-xs text-emerald-300/80">
+                      Score: {scores?.[i] ?? 0}
+                    </div>
+                  </div>
+                );
+              })}
           </div>
 
           {/* Board */}
@@ -190,7 +211,7 @@ export default function Memory() {
           <div className="rounded-xl border border-emerald-700/40 bg-black/40 p-3 flex flex-wrap items-center gap-2">
             {phase === "reveal" && (
               <button onClick={next} className="inline-flex items-center gap-2 rounded border border-emerald-700/60 px-3 py-2 text-xs text-emerald-200 hover:bg-emerald-600/10">
-                Continue <ArrowRightCircle className="h-4 w-4"/>
+                Continue <ArrowRightCircle className="h-4 w-4" />
               </button>
             )}
             {phase === "finished" && (
