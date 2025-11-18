@@ -1,0 +1,14 @@
+{ "columns":27,
+ "image":"../sprites/City.png",
+ "imageheight":288,
+ "imagewidth":432,
+ "margin":0,
+ "name":"City",
+ "spacing":0,
+ "tilecount":486,
+ "tiledversion":"1.11.2",
+ "tileheight":16,
+ "tilewidth":16,
+ "type":"tileset",
+ "version":"1.10"
+}
