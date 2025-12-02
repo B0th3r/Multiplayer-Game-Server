@@ -4,7 +4,7 @@ import { LogOut } from "lucide-react";
 import { DIALOGUE } from "./dialogue/index.js";
 import { GAME, MAPS, SPRITE } from "./environment/gameConfig.js";
 import { loadTMJ, loadImage, gidToDrawInfo } from "./environment/tmjLoader.js";
-
+import ObjectivesPanel from './objectives';
 
 const hasFlag = (f) => GAME.flags.has(f);
 const hasClue = (c) => GAME.clues.has(c);
@@ -22,15 +22,6 @@ function canShow(choice) {
   return true;
 }
 
-function applySet(set) {
-  if (!set) return;
-  set.flagsAdd?.forEach(addFlag);
-  set.cluesAdd?.forEach(addClue);
-  if (set.claimAdd) {
-    const { npcId, claimId } = set.claimAdd;
-    (GAME.claims[npcId] ??= new Set()).add(claimId);
-  }
-}
 
 const SCALE = 2;
 const VIEW_COLS = 20;
@@ -201,78 +192,22 @@ function TilesetPreview({ tilesets }) {
 function createNpc({ id, name, x, y, gid, dialogueId }) {
   return { id, name, x, y, gid, dialogueId, cooldownMs: 400, };
 }
-function DialogueOverlay({ dialogue, setDialogue, setPresenting }) {
-  if (!dialogue) return null;
-
-  const dlg = DIALOGUE[dialogue.dlgId];
-  const node = dlg?.nodes[dialogue.nodeId];
-  const choices = (node?.choices || []).filter(canShow);
-
-  return (
-    <div className="absolute inset-0 pointer-events-none z-[60]">
-      <div className="absolute left-0 right-0 bottom-3 flex justify-center">
-        <div className="pointer-events-auto w-full max-w-3xl mx-4 p-4 rounded-xl bg-slate-900/95 ring-1 ring-white/10">
-          <div className="text-xs opacity-60 mb-1">{dialogue.npcName}</div>
-          <div className="text-slate-100 mb-3">{node?.text}</div>
-
-          {choices.length ? (
-            <div className="grid gap-2">
-              {choices.map((c, i) => (
-                <button
-                  key={i}
-                  className="text-left px-3 py-2 rounded-lg bg-slate-800/70 hover:bg-slate-700/70 ring-1 ring-white/10"
-                  onClick={() => {
-                    if (c.present) {
-                      setPresenting(true);
-                      return;
-                    }
-                    const next = dlg.nodes[c.next];
-                    if (next?.end) setDialogue(null);
-                    else
-                      setDialogue((d) => ({
-                        ...d,
-                        nodeId: c.next,
-                      }));
-                  }}
-                >
-                  <span className="opacity-60 mr-2">{i + 1}.</span>
-                  {c.label}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="text-xs opacity-60">Press Esc to close</div>
-          )}
-
-          <button
-            onClick={() => setDialogue(null)}
-            className="mt-3 text-sm text-slate-400 hover:text-slate-200"
-          >
-            Close (Esc)
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function App() {
   const currentMapNameRef = useRef("neighborhood");
   const canvasRef = useRef(null);
   const navigate = useNavigate();
-
   const [map, setMap] = useState(null);
   const [showPalette, setShowPalette] = useState(false);
-
   const [npcs, setNpcs] = useState([]);
-
   const [dialogue, setDialogue] = useState(null);
   const [presenting, setPresenting] = useState(false);
   const visitedNodesRef = useRef(new Set());
   const playerRef = useRef({ x: 3, y: 3 });
   const lastStepRef = useRef(0);
   const cameraRef = useRef({ x: 0, y: 0 });
-
+  const [objectivesMinimized, setObjectivesMinimized] = useState(false);
+  const [objectivesRefresh, setObjectivesRefresh] = useState(0);
   const keysRef = useKeyboard();
   const isTouch = useIsTouch();
   const press = (k) => keysRef.current.add(k);
@@ -312,6 +247,97 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+  function applySet(set) {
+    if (!set) return;
+    set.flagsAdd?.forEach(addFlag);
+    set.cluesAdd?.forEach(addClue);
+    if (set.claimAdd) {
+      const { npcId, claimId } = set.claimAdd;
+      (GAME.claims[npcId] ??= new Set()).add(claimId);
+    }
+    setObjectivesRefresh(prev => prev + 1);
+  }
+
+  function DialogueOverlay({ dialogue, setDialogue, setPresenting }) {
+    if (!dialogue) return null;
+
+    const dlg = DIALOGUE[dialogue.dlgId];
+    const node = dlg?.nodes[dialogue.nodeId];
+
+    const segments = node?.segments;
+    const choices = (node?.choices || []).filter(canShow);
+
+    const displaySegments =
+      Array.isArray(segments) && segments.length > 0
+        ? segments
+        : node?.text
+          ? [{ speaker: dialogue.npcName, text: node.text }]
+          : [];
+
+    return (
+      <div className="absolute inset-0 pointer-events-none z-[60]">
+        <div className="absolute left-0 right-0 bottom-3 flex justify-center">
+          <div className="pointer-events-auto w-full max-w-3xl mx-4 p-4 rounded-xl bg-slate-900/95 ring-1 ring-white/10">
+            <div className="text-xs opacity-60 mb-1">{dialogue.npcName}</div>
+
+            {/* Segments block */}
+            <div className="mb-3 space-y-1">
+              {displaySegments.map((seg, i) => (
+                <div key={i} className="text-slate-100 leading-snug">
+                  {seg.speaker && (
+                    <span className="mr-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      {seg.speaker}
+                    </span>
+                  )}
+                  <span>{seg.text}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Choices */}
+            {choices.length ? (
+              <div className="grid gap-2">
+                {choices.map((c, i) => (
+                  <button
+                    key={i}
+                    className="text-left px-3 py-2 rounded-lg bg-slate-800/70 hover:bg-slate-700/70 ring-1 ring-white/10"
+                    onClick={() => {
+                      if (c.present) {
+                        setPresenting(true);
+                        return;
+                      }
+                      if (c.set) applySet(c.set);
+                      const next = dlg.nodes[c.next];
+                      if (next?.end) {
+                        setDialogue(null);
+                      } else {
+                        setDialogue((d) => ({
+                          ...d,
+                          nodeId: c.next,
+                        }));
+                      }
+                    }}
+                  >
+                    <span className="opacity-60 mr-2">{i + 1}.</span>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs opacity-60">Press Esc to close</div>
+            )}
+
+            <button
+              onClick={() => setDialogue(null)}
+              className="mt-3 text-sm text-slate-400 hover:text-slate-200"
+            >
+              Close (Esc)
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   async function loadNamedMap(name) {
     const def = MAPS[name];
@@ -335,19 +361,22 @@ export default function App() {
     currentMapNameRef.current = name;
     updateCamera();
   }
-
   function updateCamera() {
     if (!map) return;
+
     const p = playerRef.current;
+    const effCols = Math.min(VIEW_COLS, map.width);
+    const effRows = Math.min(VIEW_ROWS, map.height);
+
     cameraRef.current.x = clamp(
-      p.x - Math.floor(VIEW_COLS / 2),
+      p.x - Math.floor(effCols / 2),
       0,
-      map.width - VIEW_COLS
+      map.width - effCols
     );
     cameraRef.current.y = clamp(
-      p.y - Math.floor(VIEW_ROWS / 2),
+      p.y - Math.floor(effRows / 2),
       0,
-      map.height - VIEW_ROWS
+      map.height - effRows
     );
   }
 
@@ -382,9 +411,7 @@ export default function App() {
 
   function getCollisionLayer() {
     if (!map) return null;
-    const named = map.layers.find((l) =>
-      /collide|collision/i.test(l.name)
-    );
+    const named = map.layers[1];
     if (!named) {
       console.warn(
         "[collision] Missing collision layer; blocking out-of-bounds only."
@@ -563,7 +590,7 @@ export default function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [npcs, dialogue]);
-
+ 
   function isAdjacentToPlayer(tx, ty) {
     const p = playerRef.current;
     return Math.abs(p.x - tx) + Math.abs(p.y - ty) === 1;
@@ -597,10 +624,10 @@ export default function App() {
 
       // Draw tile layers
       for (const layer of map.layers) {
-        for (let ry = 0; ry < VIEW_ROWS; ry++) {
+        for (let ry = 0; ry < effRows; ry++) {
           const my = cam.y + ry;
           if (my < 0 || my >= map.height) continue;
-          for (let rx = 0; rx < VIEW_COLS; rx++) {
+          for (let rx = 0; rx < effCols; rx++) {
             const mx = cam.x + rx;
             if (mx < 0 || mx >= map.width) continue;
             const rawGid = layer.grid[my][mx];
@@ -691,8 +718,12 @@ export default function App() {
 
   const tileW = map?.tilewidth ?? TILE_SIZE_FALLBACK;
   const tileH = map?.tileheight ?? TILE_SIZE_FALLBACK;
-  const width = VIEW_COLS * tileW * SCALE;
-  const height = VIEW_ROWS * tileH * SCALE;
+  const effCols = Math.min(VIEW_COLS, map?.width ?? VIEW_COLS);
+  const effRows = Math.min(VIEW_ROWS, map?.height ?? VIEW_ROWS);
+
+  const width = effCols * tileW * SCALE;
+  const height = effRows * tileH * SCALE;
+
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-slate-900 to-slate-800 text-slate-100 flex items-center justify-center p-6">
@@ -729,6 +760,12 @@ export default function App() {
             dialogue={dialogue}
             setDialogue={setDialogue}
             setPresenting={setPresenting}
+          />
+          <ObjectivesPanel
+            gameState={GAME}
+            isMinimized={objectivesMinimized}
+            onToggle={() => setObjectivesMinimized(!objectivesMinimized)}
+            key={objectivesRefresh}
           />
 
           {showPalette && (
