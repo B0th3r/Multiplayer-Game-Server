@@ -5,11 +5,14 @@ import { DIALOGUE } from "./dialogue/index.js";
 import { GAME, MAPS, SPRITE } from "./environment/gameConfig.js";
 import { loadTMJ, loadImage, gidToDrawInfo } from "./environment/tmjLoader.js";
 import ObjectivesPanel from './objectives';
+import { playVoice, stopVoice } from "./environment/audioManager.js";
+import { playCutscene } from './environment/cutsceneManager.js';
 
 const hasFlag = (f) => GAME.flags.has(f);
 const hasClue = (c) => GAME.clues.has(c);
 const addFlag = (f) => GAME.flags.add(f);
 const addClue = (c) => GAME.clues.add(c);
+
 
 function canShow(choice) {
   const r = choice.requires;
@@ -195,6 +198,7 @@ function createNpc({ id, name, x, y, gid, dialogueId }) {
 
 export default function App() {
   const currentMapNameRef = useRef("neighborhood");
+  const [transitionMessage, setTransitionMessage] = useState(null);
   const canvasRef = useRef(null);
   const navigate = useNavigate();
   const [map, setMap] = useState(null);
@@ -208,6 +212,7 @@ export default function App() {
   const cameraRef = useRef({ x: 0, y: 0 });
   const [objectivesMinimized, setObjectivesMinimized] = useState(false);
   const [objectivesRefresh, setObjectivesRefresh] = useState(0);
+  const [segmentIndex, setSegmentIndex] = useState(0);
   const keysRef = useKeyboard();
   const isTouch = useIsTouch();
   const press = (k) => keysRef.current.add(k);
@@ -229,7 +234,9 @@ export default function App() {
     if (!confirm("Leave this room?")) return;
     navigate("/", { replace: true });
   };
-
+useEffect(() => {
+    loadNamedMap("neighborhood").catch(console.error);
+  }, []);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -247,10 +254,25 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+  useEffect(() => {
+    if (GAME.flags.has("cutscene_leave_office")) {
+      GAME.flags.delete("cutscene_leave_office");
+
+      const context = {
+        loadNamedMap,
+        playerRef,
+        setTransitionMessage,
+        setDialogue
+      };
+
+      playCutscene("leave_office", context);
+    }
+  }, [dialogue]);
   function applySet(set) {
     if (!set) return;
     set.flagsAdd?.forEach(addFlag);
     set.cluesAdd?.forEach(addClue);
+    set.flagsRemove?.forEach(f => GAME.flags.delete(f));
     if (set.claimAdd) {
       const { npcId, claimId } = set.claimAdd;
       (GAME.claims[npcId] ??= new Set()).add(claimId);
@@ -267,12 +289,23 @@ export default function App() {
     const segments = node?.segments;
     const choices = (node?.choices || []).filter(canShow);
 
-    const displaySegments =
-      Array.isArray(segments) && segments.length > 0
-        ? segments
-        : node?.text
-          ? [{ speaker: dialogue.npcName, text: node.text }]
-          : [];
+    const hasSegments = Array.isArray(segments) && segments.length > 0;
+    const visibleSegments = hasSegments
+      ? segments.filter(seg => {
+        if (!seg.requires) return true;
+        return canShow({ requires: seg.requires });
+      })
+      : [];
+    const totalSegments = visibleSegments.length;
+    const atLastSegment = totalSegments <= 0 ? true : segmentIndex >= totalSegments - 1;
+
+    let currentSeg = null;
+    if (visibleSegments.length > 0) {
+      const idx = Math.min(segmentIndex, visibleSegments.length - 1);
+      currentSeg = visibleSegments[idx];
+    } else if (node?.text) {
+      currentSeg = { speaker: dialogue.npcName, text: node.text };
+    }
 
     return (
       <div className="absolute inset-0 pointer-events-none z-[60]">
@@ -280,22 +313,34 @@ export default function App() {
           <div className="pointer-events-auto w-full max-w-3xl mx-4 p-4 rounded-xl bg-slate-900/95 ring-1 ring-white/10">
             <div className="text-xs opacity-60 mb-1">{dialogue.npcName}</div>
 
-            {/* Segments block */}
+            {/* Single current segment */}
             <div className="mb-3 space-y-1">
-              {displaySegments.map((seg, i) => (
-                <div key={i} className="text-slate-100 leading-snug">
-                  {seg.speaker && (
+              {currentSeg && (
+                <div className="text-slate-100 leading-snug">
+                  {currentSeg.speaker && (
                     <span className="mr-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      {seg.speaker}
+                      {currentSeg.speaker}
                     </span>
                   )}
-                  <span>{seg.text}</span>
+                  <span>{currentSeg.text}</span>
                 </div>
-              ))}
+              )}
             </div>
 
-            {/* Choices */}
-            {choices.length ? (
+
+            {/* Next / Choices */}
+            {hasSegments && !atLastSegment ? (
+              <div className="flex justify-end">
+                <button
+                  className="px-4 py-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-sm"
+                  onClick={() =>
+                    setSegmentIndex((i) => Math.min(i + 1, totalSegments - 1))
+                  }
+                >
+                  Next
+                </button>
+              </div>
+            ) : choices.length ? (
               <div className="grid gap-2">
                 {choices.map((c, i) => (
                   <button
@@ -331,7 +376,7 @@ export default function App() {
               onClick={() => setDialogue(null)}
               className="mt-3 text-sm text-slate-400 hover:text-slate-200"
             >
-              Close (Esc)
+              Press Esc to close
             </button>
           </div>
         </div>
@@ -354,7 +399,17 @@ export default function App() {
         })
       )
     );
-
+    if (def.autoStartDialogue) {
+      const npc = def.npcs.find(n => n.id === def.autoStartDialogue);
+      if (npc && DIALOGUE[npc.dialogueId]) {
+        setDialogue({
+          npcId: npc.id,
+          npcName: npc.name,
+          dlgId: npc.dialogueId,
+          nodeId: DIALOGUE[npc.dialogueId].start,
+        });
+      }
+    }
     playerRef.current.x = def.start.x;
     playerRef.current.y = def.start.y;
 
@@ -503,9 +558,15 @@ export default function App() {
       checkMapExit();
     }
   }
+  useEffect(() => { 
+    setSegmentIndex(0);
+  }, [dialogue?.dlgId, dialogue?.nodeId]);
 
   useEffect(() => {
-    if (!dialogue) return;
+    if (!dialogue) {
+      stopVoice();
+      return;
+    }
     const dlg = DIALOGUE[dialogue.dlgId];
     if (!dlg) return;
     const node = dlg.nodes[dialogue.nodeId];
@@ -516,7 +577,9 @@ export default function App() {
       visitedNodesRef.current.add(key);
       applySet(node.set);
     }
-
+    if (node.onEnter) {
+      node.onEnter(GAME);
+    }
     if (node.gate) {
       const ok =
         (!node.gate.cluesAll ||
@@ -528,8 +591,38 @@ export default function App() {
         setDialogue((d) => ({ ...d, nodeId: fallback }));
       }
     }
-  }, [dialogue]);
 
+    let played = false;
+
+    const segs = node.segments;
+    if (Array.isArray(segs) && segs.length > 0) {
+      const visible = segs.filter(seg => !seg.requires || canShow({ requires: seg.requires }));
+      const total = visible.length;
+      const idx = Math.min(segmentIndex, Math.max(total - 1, 0));
+      const seg = total > 0 ? visible[idx] : null;
+
+      if (seg?.voice && seg?.speaker) {
+        playVoice(seg.speaker.toLowerCase(), seg.voice, { interrupt: true });
+        played = true;
+      }
+    }
+
+    if (!played) stopVoice();
+
+  }, [dialogue, segmentIndex]);
+  useEffect(() => {
+    const dlg = dialogue ? DIALOGUE[dialogue.dlgId] : null;
+    const node = dlg ? dlg.nodes[dialogue.nodeId] : null;
+    const segs = node?.segments;
+    const hasSegments = Array.isArray(segs) && segs.length > 0;
+
+    if (!hasSegments) return;
+
+    const visible = segs.filter(seg => !seg.requires || canShow({ requires: seg.requires }));
+    const total = visible.length;
+
+    setSegmentIndex(i => Math.min(i, Math.max(total - 1, 0)));
+  }, [dialogue, objectivesRefresh]);
   useEffect(() => {
     const onKey = (e) => {
       const k = e.key.toLowerCase();
@@ -574,12 +667,42 @@ export default function App() {
           if (now - npc._lastTalkAt < npc.cooldownMs) return;
           npc._lastTalkAt = now;
 
+          // In StoryMode.jsx, modify your dialogue opener:
           if (npc.dialogueId && DIALOGUE[npc.dialogueId]) {
+            const dlg = DIALOGUE[npc.dialogueId];
+
+            // Check for active conversation resume point first
+            const resumeFlag = `resume_${npc.id}`;
+            const resumeNode = GAME.metadata.get(resumeFlag);
+
+            if (resumeNode && dlg.nodes[resumeNode]) {
+              // Resume an ongoing conversation
+              GAME.metadata.delete(resumeFlag); // Clear resume point
+              setDialogue({
+                npcId: npc.id,
+                npcName: npc.name,
+                dlgId: npc.dialogueId,
+                nodeId: resumeNode,
+              });
+              return;
+            }
+
+            // Otherwise check if we've met before
+            const metFlag = `met_${npc.id}`;
+            const hasMetBefore = GAME.flags.has(metFlag);
+
+            let startNode = dlg.start;
+            if (hasMetBefore && dlg.nodes.return_visit) {
+              startNode = "return_visit";
+            } else {
+              GAME.flags.add(metFlag);
+            }
+
             setDialogue({
               npcId: npc.id,
               npcName: npc.name,
               dlgId: npc.dialogueId,
-              nodeId: DIALOGUE[npc.dialogueId].start,
+              nodeId: startNode,
             });
           }
           return;
@@ -590,15 +713,11 @@ export default function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [npcs, dialogue]);
- 
+
   function isAdjacentToPlayer(tx, ty) {
     const p = playerRef.current;
     return Math.abs(p.x - tx) + Math.abs(p.y - ty) === 1;
   }
-
-  useEffect(() => {
-    loadNamedMap("neighborhood").catch(console.error);
-  }, []);
 
   useEffect(() => {
     if (!map) return;
@@ -767,7 +886,13 @@ export default function App() {
             onToggle={() => setObjectivesMinimized(!objectivesMinimized)}
             key={objectivesRefresh}
           />
-
+          {transitionMessage && (
+            <div className="absolute inset-0 bg-black z-[70] flex items-center justify-center pointer-events-none">
+              <div className="text-xl text-slate-300 animate-fade-in">
+                {transitionMessage}
+              </div>
+            </div>
+          )}
           {showPalette && (
             <div className="absolute top-14 right-2 bg-slate-900/90 backdrop-blur rounded-xl p-3 ring-1 ring-white/10 text-xs text-slate-100">
               <div className="mb-2">
