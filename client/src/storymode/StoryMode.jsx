@@ -12,7 +12,7 @@ const hasFlag = (f) => GAME.flags.has(f);
 const hasClue = (c) => GAME.clues.has(c);
 const addFlag = (f) => GAME.flags.add(f);
 const addClue = (c) => GAME.clues.add(c);
-
+GAME.metadata.set("playerName", "detective");
 
 function canShow(choice) {
   const r = choice.requires;
@@ -217,6 +217,54 @@ export default function App() {
   const isTouch = useIsTouch();
   const press = (k) => keysRef.current.add(k);
   const release = (k) => keysRef.current.delete(k);
+  const suppressNextVoiceRef = useRef(false);
+  const skipNextSegmentResetRef = useRef(false);
+  const pendingSegmentRestoreRef = useRef(null);
+  const playedSegmentCutscenesRef = useRef(new Set());
+  const [activeObjectives, setActiveObjectives] = useState([]);
+
+
+  function resolveWaypointTile(waypoint, npcs, mapName, mapDef) {
+    if (!waypoint) return null;
+
+    if (waypoint.type === "npc") {
+      const npc = npcs.find(n => n.id === waypoint.id);
+      if (!npc) return null;
+      return { x: npc.x, y: npc.y };
+    }
+
+    if (waypoint.type === "exit") {
+      const ex = (mapDef?.exits ?? []).find(e => e.to === waypoint.to);
+      if (!ex) return null;
+      return { x: ex.x, y: ex.y };
+    }
+
+    if (waypoint.type === "tile") {
+      if (waypoint.map && waypoint.map !== mapName) return null;
+      return { x: waypoint.x, y: waypoint.y };
+    }
+
+    return null;
+  }
+
+  function drawWaypointMarker(ctx, px, py, tileSize, isOptional) {
+    const cx = px + tileSize / 2;
+    const cy = py - tileSize * 0.35;
+
+    ctx.save();
+    ctx.font = `${Math.floor(tileSize * 0.9)}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "black";
+    ctx.strokeText("!", cx, cy);
+
+    ctx.fillStyle = isOptional ? "#fbbf24" : "white";
+    ctx.fillText("!", cx, cy);
+
+    ctx.restore();
+  }
 
   // Sprite images and animation state
   const spriteRef = useRef({ idle: null, walk: null });
@@ -234,7 +282,7 @@ export default function App() {
     if (!confirm("Leave this room?")) return;
     navigate("/", { replace: true });
   };
-useEffect(() => {
+  useEffect(() => {
     loadNamedMap("neighborhood").catch(console.error);
   }, []);
   useEffect(() => {
@@ -255,19 +303,40 @@ useEffect(() => {
     };
   }, []);
   useEffect(() => {
-    if (GAME.flags.has("cutscene_leave_office")) {
-      GAME.flags.delete("cutscene_leave_office");
 
-      const context = {
-        loadNamedMap,
-        playerRef,
-        setTransitionMessage,
-        setDialogue
-      };
+    const cutsceneTriggers = [
+      { flag: "cutscene_leave_office", cutsceneId: "leave_office" },
+      { flag: "cutscene_going_to_maya", cutsceneId: "going_to_maya" },
+      { flag: "cutscene_marcus_enters", cutsceneId: "marcus_enters" },
+      { flag: "cutscene_maya_leaves", cutsceneId: "maya_leaves" },
 
-      playCutscene("leave_office", context);
+    ];
+
+    const context = {
+      loadNamedMap,
+      playerRef,
+      setTransitionMessage,
+      setDialogue,
+      npcs,
+      setNpcs,
+    };
+
+    for (const { flag, cutsceneId } of cutsceneTriggers) {
+      if (GAME.flags.has(flag)) {
+        GAME.flags.delete(flag);
+        playCutscene(cutsceneId, context);
+        break;
+      }
     }
   }, [dialogue]);
+  useEffect(() => {
+    if (!dialogue) return;
+    if (pendingSegmentRestoreRef.current == null) return;
+
+    setSegmentIndex(pendingSegmentRestoreRef.current);
+    pendingSegmentRestoreRef.current = null;
+  }, [dialogue?.dlgId, dialogue?.nodeId]);
+
   function applySet(set) {
     if (!set) return;
     set.flagsAdd?.forEach(addFlag);
@@ -280,7 +349,88 @@ useEffect(() => {
     setObjectivesRefresh(prev => prev + 1);
   }
 
-  function DialogueOverlay({ dialogue, setDialogue, setPresenting }) {
+  const PROVOKE_TOKEN = "__PROVOKE__";
+  const PROVOKE_RETURN_TOKEN = "__PROVOKE_RETURN__";
+
+  function runChoice(choice) {
+    if (!dialogue) return;
+
+    const dlg = DIALOGUE[dialogue.dlgId];
+    if (!dlg) return;
+
+    if (choice.present) {
+      setPresenting(true);
+      return;
+    }
+
+    if (choice.set) applySet(choice.set);
+    if (choice.cutscene) {
+      playCutscene(choice.cutscene, {
+        loadNamedMap,
+        playerRef,
+        setTransitionMessage,
+        setDialogue,
+        npcs,
+        setNpcs,
+      });
+    }
+
+    if (choice.next === PROVOKE_RETURN_TOKEN) {
+      const returnNodeKey = `provokeReturnNode_${dialogue.npcId}`;
+      const returnSegKey = `provokeReturnSeg_${dialogue.npcId}`;
+
+      const savedNodeId = GAME.metadata.get(returnNodeKey) ?? dlg.start;
+      const savedSegIndex = GAME.metadata.get(returnSegKey) ?? 0;
+
+      skipNextSegmentResetRef.current = true;
+      suppressNextVoiceRef.current = true;
+      pendingSegmentRestoreRef.current = savedSegIndex;
+
+      setDialogue(d => ({ ...d, nodeId: savedNodeId }));
+      return;
+    }
+
+    if (choice.provoke || choice.next === PROVOKE_TOKEN) {
+      const returnNodeKey = `provokeReturnNode_${dialogue.npcId}`;
+      const returnSegKey = `provokeReturnSeg_${dialogue.npcId}`;
+
+      GAME.metadata.set(returnNodeKey, dialogue.nodeId);
+      GAME.metadata.set(returnSegKey, segmentIndex);
+
+      const strikesKey = `provokeStrikes_${dialogue.npcId}`;
+      const strikes = (GAME.metadata.get(strikesKey) ?? 0) + 1;
+      GAME.metadata.set(strikesKey, strikes);
+
+      if (dialogue.npcId === "tim") {
+        const provokeNode =
+          strikes >= 3 ? "tim_provoke_done" :
+            strikes === 1 ? "tim_provoke_warn1" : "tim_provoke_warn2";
+
+        setDialogue(d => ({ ...d, nodeId: provokeNode }));
+        return;
+      }
+    }
+    const nextId = choice.next;
+    const next = dlg.nodes[nextId];
+    if (next?.end) {
+      if (next.endCutscene) {
+        playCutscene(next.endCutscene, {
+          loadNamedMap,
+          playerRef,
+          setTransitionMessage,
+          setDialogue,
+          npcs,
+          setNpcs,
+        });
+      }
+      setDialogue(null);
+    } else {
+      setDialogue((d) => ({ ...d, nodeId: nextId }));
+    }
+  }
+
+
+  function DialogueOverlay({ dialogue, setDialogue }) {
     if (!dialogue) return null;
 
     const dlg = DIALOGUE[dialogue.dlgId];
@@ -298,6 +448,12 @@ useEffect(() => {
       : [];
     const totalSegments = visibleSegments.length;
     const atLastSegment = totalSegments <= 0 ? true : segmentIndex >= totalSegments - 1;
+    function formatText(text) {
+      if (!text) return text;
+      return text.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+        return GAME.metadata.get(key) ?? "";
+      });
+    }
 
     let currentSeg = null;
     if (visibleSegments.length > 0) {
@@ -322,7 +478,7 @@ useEffect(() => {
                       {currentSeg.speaker}
                     </span>
                   )}
-                  <span>{currentSeg.text}</span>
+                  <span>{formatText(currentSeg.text)}</span>
                 </div>
               )}
             </div>
@@ -346,22 +502,7 @@ useEffect(() => {
                   <button
                     key={i}
                     className="text-left px-3 py-2 rounded-lg bg-slate-800/70 hover:bg-slate-700/70 ring-1 ring-white/10"
-                    onClick={() => {
-                      if (c.present) {
-                        setPresenting(true);
-                        return;
-                      }
-                      if (c.set) applySet(c.set);
-                      const next = dlg.nodes[c.next];
-                      if (next?.end) {
-                        setDialogue(null);
-                      } else {
-                        setDialogue((d) => ({
-                          ...d,
-                          nodeId: c.next,
-                        }));
-                      }
-                    }}
+                    onClick={() => runChoice(c)}
                   >
                     <span className="opacity-60 mr-2">{i + 1}.</span>
                     {c.label}
@@ -378,7 +519,7 @@ useEffect(() => {
             >
               Press Esc to close
             </button>
-          </div>
+          </div>loadNamedMap
         </div>
       </div>
     );
@@ -391,7 +532,6 @@ useEffect(() => {
     const loaded = await loadTMJ(def.path);
     setMap(loaded);
 
-    // Spawn this map’s NPCs
     setNpcs(
       def.npcs.map((n) =>
         createNpc({
@@ -399,6 +539,7 @@ useEffect(() => {
         })
       )
     );
+
     if (def.autoStartDialogue) {
       const npc = def.npcs.find(n => n.id === def.autoStartDialogue);
       if (npc && DIALOGUE[npc.dialogueId]) {
@@ -410,12 +551,15 @@ useEffect(() => {
         });
       }
     }
+
     playerRef.current.x = def.start.x;
     playerRef.current.y = def.start.y;
 
     currentMapNameRef.current = name;
     updateCamera();
   }
+
+
   function updateCamera() {
     if (!map) return;
 
@@ -433,6 +577,19 @@ useEffect(() => {
       0,
       map.height - effRows
     );
+  }
+  function getObjectiveWaypoints(obj, gameState) {
+    const list = [];
+
+    if (obj.waypoint) list.push(obj.waypoint);
+    if (Array.isArray(obj.waypoints)) list.push(...obj.waypoints);
+
+    // Filter: hide completed sub-waypoints
+    return list.filter(wp => {
+      if (!wp) return false;
+      if (wp.hideWhenFlag && gameState.flags.has(wp.hideWhenFlag)) return false;
+      return true;
+    });
   }
 
   function checkMapExit() {
@@ -558,10 +715,6 @@ useEffect(() => {
       checkMapExit();
     }
   }
-  useEffect(() => { 
-    setSegmentIndex(0);
-  }, [dialogue?.dlgId, dialogue?.nodeId]);
-
   useEffect(() => {
     if (!dialogue) {
       stopVoice();
@@ -600,8 +753,28 @@ useEffect(() => {
       const total = visible.length;
       const idx = Math.min(segmentIndex, Math.max(total - 1, 0));
       const seg = total > 0 ? visible[idx] : null;
+      if (seg?.cutscene) {
+        const key = `${dialogue.dlgId}:${dialogue.nodeId}:${idx}:${seg.cutscene}`;
+        if (!playedSegmentCutscenesRef.current.has(key)) {
+          playedSegmentCutscenesRef.current.add(key);
 
+          playCutscene(seg.cutscene, {
+            loadNamedMap,
+            playerRef,
+            setTransitionMessage,
+            setDialogue,
+            npcs,
+            setNpcs,
+          });
+        }
+      }
       if (seg?.voice && seg?.speaker) {
+        if (suppressNextVoiceRef.current) {
+          suppressNextVoiceRef.current = false;
+          stopVoice();
+          return;
+        }
+
         playVoice(seg.speaker.toLowerCase(), seg.voice, { interrupt: true });
         played = true;
       }
@@ -623,6 +796,14 @@ useEffect(() => {
 
     setSegmentIndex(i => Math.min(i, Math.max(total - 1, 0)));
   }, [dialogue, objectivesRefresh]);
+  useEffect(() => {
+    if (skipNextSegmentResetRef.current) {
+      skipNextSegmentResetRef.current = false;
+      return;
+    }
+    setSegmentIndex(0);
+  }, [dialogue?.dlgId, dialogue?.nodeId]);
+
   useEffect(() => {
     const onKey = (e) => {
       const k = e.key.toLowerCase();
@@ -646,15 +827,7 @@ useEffect(() => {
         const visible = (node.choices || []).filter(canShow);
         const idx = Number(k) - 1;
         const choice = visible[idx];
-        if (choice) {
-          if (choice.present) {
-            setPresenting(true);
-            return;
-          }
-          const nextNode = dlg.nodes[choice.next];
-          if (nextNode?.end) setDialogue(null);
-          else setDialogue((d) => ({ ...d, nodeId: choice.next }));
-        }
+        if (choice) runChoice(choice);
         return;
       }
 
@@ -667,11 +840,9 @@ useEffect(() => {
           if (now - npc._lastTalkAt < npc.cooldownMs) return;
           npc._lastTalkAt = now;
 
-          // In StoryMode.jsx, modify your dialogue opener:
           if (npc.dialogueId && DIALOGUE[npc.dialogueId]) {
             const dlg = DIALOGUE[npc.dialogueId];
 
-            // Check for active conversation resume point first
             const resumeFlag = `resume_${npc.id}`;
             const resumeNode = GAME.metadata.get(resumeFlag);
 
@@ -687,7 +858,6 @@ useEffect(() => {
               return;
             }
 
-            // Otherwise check if we've met before
             const metFlag = `met_${npc.id}`;
             const hasMetBefore = GAME.flags.has(metFlag);
 
@@ -696,6 +866,10 @@ useEffect(() => {
               startNode = "return_visit";
             } else {
               GAME.flags.add(metFlag);
+            }
+
+            if (npc.id === "tim" && GAME.flags.has("tim_shutdown") && dlg.nodes.shutdown) {
+              startNode = "shutdown";
             }
 
             setDialogue({
@@ -779,6 +953,33 @@ useEffect(() => {
         ctx.drawImage(info.img, info.sx, info.sy, info.sw, info.sh, rx, ry, tw, th);
         ctx.restore();
       }
+      let markerIndex = 0;
+      const mapName = currentMapNameRef.current;
+      const mapDef = MAPS[mapName];
+
+      for (const obj of activeObjectives) {
+        const waypoints = getObjectiveWaypoints(obj, GAME);
+
+        for (const wp of waypoints) {
+          const tile = resolveWaypointTile(wp, npcs, mapName, mapDef);
+          if (!tile) continue;
+
+          const screenX = (tile.x - cam.x) * tw;
+          const screenY = (tile.y - cam.y) * th;
+
+          drawWaypointMarker(
+            ctx,
+            screenX,
+            screenY - (markerIndex % 3) * 8,
+            tw,
+            obj.optional
+          );
+
+          markerIndex++;
+        }
+      }
+
+
 
       // Draw player
       const p = playerRef.current;
@@ -885,6 +1086,7 @@ useEffect(() => {
             isMinimized={objectivesMinimized}
             onToggle={() => setObjectivesMinimized(!objectivesMinimized)}
             key={objectivesRefresh}
+            onActiveObjectives={setActiveObjectives}
           />
           {transitionMessage && (
             <div className="absolute inset-0 bg-black z-[70] flex items-center justify-center pointer-events-none">
