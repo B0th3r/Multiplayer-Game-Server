@@ -6,7 +6,7 @@ const jimDonnaDialogue = {
       segments: [
         {
           speaker: "donna",
-          text: "Oh— detective, right? Your partner said you'd be by. Please, come in.",
+          text: "Oh, detective, right? Your partner said you'd be by. Please, come in.",
           voice: "intro_01",
         },
         {
@@ -26,7 +26,32 @@ const jimDonnaDialogue = {
           next: "john",
           set: { flagsAdd: ["talkedToJim", "talkedToDonna"] },
         },
-        { label: "[Leave]", next: "end" },
+        { label: "[Leave]", next: "end_02" },
+      ],
+    },
+
+    timeline_menu: {
+      segments: [],
+      choices: [
+        { label: "You think you dropped it?", next: "drop_explain", requires: { notFlags: ["asked_drop_explain"] } },
+        { label: "How did you get it back?", next: "sam_intro", requires: { notFlags: ["asked_sam_intro"] } },
+        { label: "When did you notice the missing $20?", next: "checked_when", requires: { notFlags: ["asked_checked_when"] } },
+        { label: "Let's talk about the missing money.", next: "money_missing", requires: { notFlags: ["asked_money_missing"] } },
+
+        { label: "Ask about John's robbery.", next: "john" },
+        { label: "Let's talk about your neighbors.", next: "suspects_menu_silent" },
+        { label: "[Leave]", next: "end_02" },
+      ],
+    },
+
+    suspects_menu_silent: {
+      segments: [],
+      choices: [
+        { label: "Sam", next: "sam_info" },
+        { label: "John", next: "john_info" },
+        { label: "Tim", next: "tim_info" },
+        { label: "Back to the timeline.", next: "timeline_menu" },
+        { label: "[Leave]", next: "end_01" },
       ],
     },
 
@@ -49,15 +74,20 @@ const jimDonnaDialogue = {
         },
         {
           speaker: "jim",
-          text: "I was walking home, must have been past dark. Then suddenly I don't have my wallet.",
+          text: "Yeah... I was walking home, must have been past dark. Then suddenly I don't have my wallet.",
           voice: "from_beginning_04",
         },
       ],
+      set: { flagsAdd: ["asked_from_beginning"] },
       choices: [
-        { label: "You think you dropped it?", next: "drop_explain" },
-        { label: "How did you get it back?", next: "sam_intro" },
+        { label: "You think you dropped it?", next: "drop_explain", requires: { notFlags: ["asked_drop_explain"] } },
+        { label: "How did you get it back?", next: "sam_intro", requires: { notFlags: ["asked_sam_intro"] } },
         { label: "Geez— can you hurry this up?", next: "poke_01" },
-        { label: "Let's talk about the missing money.", next: "money_missing" },
+        { label: "Let's talk about the missing money.", next: "money_missing", requires: { notFlags: ["asked_money_missing"] } },
+
+        { label: "Ask about John's robbery.", next: "john" },
+        { label: "Let's talk about your neighbors.", next: "suspects_menu_silent" },
+        { label: "[Leave]", next: "end_01" },
       ],
     },
 
@@ -69,10 +99,14 @@ const jimDonnaDialogue = {
           voice: "dropped"
         },
       ],
+      set: { flagsAdd: ["asked_drop_explain"] },
       choices: [
         { label: "Where do you think you dropped it?", next: "location1" },
         { label: "Who found it?", next: "sam_intro" },
-        { label: "Okay. Keep going.", next: "from_beginning" },
+        { label: "Okay. Keep going.", next: "timeline_menu" },
+        { label: "Ask about John's robbery.", next: "john" },
+        { label: "Let's talk about your neighbors.", next: "suspects_menu_silent" },
+        { label: "[Leave]", next: "end_01" },
       ],
     },
 
@@ -84,9 +118,13 @@ const jimDonnaDialogue = {
           voice: "location_01",
         },
       ],
+      set: { flagsAdd: ["asked_location1"] },
       choices: [
         { label: "So Sam returned it the next morning?", next: "sam_intro" },
         { label: "Jim— do you remember the return?", next: "jim_memory" },
+        { label: "Ask about John's robbery.", next: "john" },
+        { label: "Let's talk about your neighbors.", next: "suspects_menu_silent" },
+        { label: "[Leave]", next: "end_01" },
       ],
     },
 
@@ -98,10 +136,14 @@ const jimDonnaDialogue = {
           voice: "memory"
         },
       ],
+      set: { flagsAdd: ["asked_jim_memory"] },
       choices: [
         { label: "When did you notice the missing $20?", next: "checked_when" },
         { label: "Let's talk about the money that went missing.", next: "money_missing" },
         { label: "Back up— how did you get it back?", next: "sam_intro" },
+        { label: "Ask about John's robbery.", next: "john" },
+        { label: "Let's talk about your neighbors.", next: "suspects_menu_silent" },
+        { label: "[Leave]", next: "end_01" },
       ],
     },
 
@@ -113,10 +155,14 @@ const jimDonnaDialogue = {
           voice: "sam_recovered_01",
         },
       ],
+      set: { flagsAdd: ["asked_sam_intro"] },
       choices: [
-        { label: "Did she say whether she opened it?", next: "sam_opened" },
+        { label: "Did she say whether she opened it?", next: "sam_opened", requires: { notFlags: ["asked_sam_opened"] } },
         { label: "Did either of you check the money then?", next: "checked_when" },
-        { label: "Alright. Let's move on.", next: "money_missing" },
+        { label: "Alright. Let's move on.", next: "timeline_menu" },
+        { label: "Ask about John's robbery.", next: "john" },
+        { label: "Let's talk about your neighbors.", next: "suspects_menu_silent" },
+        { label: "[Leave]", next: "end_01" },
       ],
     },
 
@@ -128,9 +174,13 @@ const jimDonnaDialogue = {
           voice: "opened"
         },
       ],
+      set: { flagsAdd: ["asked_sam_opened"] },
       choices: [
         { label: "Okay. When did you notice the missing $20?", next: "checked_when" },
         { label: "Let's move to the missing twenty.", next: "money_missing" },
+        { label: "Ask about John's robbery.", next: "john" },
+        { label: "Let's talk about your neighbors.", next: "suspects_menu_silent" },
+        { label: "[Leave]", next: "end_01" },
       ],
     },
 
@@ -149,15 +199,18 @@ const jimDonnaDialogue = {
         },
         {
           speaker: "donna",
-          text: "I know how that looks. But at first, we thought he just got lucky.",
+          text: "I know how that looks. But at first, we thought he just dropped the wallet got lucky.",
           voice: "checked_04",
         },
       ],
+      set: { flagsAdd: ["asked_checked_when"] },
       choices: [
-        { label: "Why did you check the money later?", next: "why_check" },
+        { label: "Why did you check the money later?", next: "why_check", requires: { notFlags: ["asked_why_check"] } },
         { label: "How much was missing, and how much was left?", next: "money_missing" },
         { label: "What a joke. Have you checked between the couch cushions?", next: "poke_02" },
-        { label: "Let's talk about possible suspects.", next: "suspects_menu" },
+        { label: "Let's talk about your neighbors.", next: "suspects_menu_silent" },
+        { label: "Ask about John's robbery.", next: "john" },
+        { label: "[Leave]", next: "end_01" },
       ],
     },
 
@@ -165,24 +218,17 @@ const jimDonnaDialogue = {
       segments: [
         {
           speaker: "donna",
-          text: "He's always forgetting things, so I do checks around the house—bills, cash, important stuff.",
+          text: "He's always forgetting things, and I always do checks around the house.",
           voice: "why_check_01",
         },
       ],
+      set: { flagsAdd: ["asked_why_check"] },
       choices: [
         { label: "How much money was missing?", next: "money_missing" },
-        { label: "Back.", next: "checked_when" },
-      ],
-    },
-
-    jim_view: {
-      segments: [
-        { speaker: "jim", text: "Honestly? I don't know. I wish I did." },
-        { speaker: "jim", text: "If I dropped it and someone found it… that $20 could've walked away at any point." },
-      ],
-      choices: [
-        { label: "Okay. Let's talk numbers.", next: "money_missing" },
-        { label: "Let's talk suspects.", next: "suspects_menu" },
+        { label: "Let's talk about your neighbors.", next: "suspects_menu_silent" },
+        { label: "Let's talk about John's robbery.", next: "john" },
+        { label: "Back.", next: "timeline_menu" },
+        { label: "[Leave]", next: "end_01" },
       ],
     },
 
@@ -199,11 +245,13 @@ const jimDonnaDialogue = {
           voice: "money_missing_02",
         },
       ],
-      set: { cluesAdd: ["clue_jim_had_120", "clue_missing_20"] },
+      set: { flagsAdd: ["asked_money_missing"], cluesAdd: ["clue_jim_had_120", "clue_missing_20"] },
       choices: [
-        { label: "They only took one $20 bill?", next: "comment_on_odd" },
+        { label: "They only took one $20 bill?", next: "comment_on_odd", requires: { notFlags: ["asked_comment_on_odd"] } },
         { label: "Let's talk about John's robbery.", next: "john" },
-        { label: "[Leave]", next: "end" },
+        { label: "Let's talk about your neighbors.", next: "suspects_menu_silent" },
+        { label: "Back.", next: "timeline_menu" },
+        { label: "[Leave]", next: "end_01" },
       ],
     },
 
@@ -230,24 +278,11 @@ const jimDonnaDialogue = {
           voice: "john_04",
         },
       ],
-      set: { cluesAdd: ["clue_john_robbed"] },
+      set: { flagsAdd: ["asked_john"], cluesAdd: ["clue_john_robbed"] },
       choices: [
-        { label: "Sam said there was an argument. Do you know anything about that?", next: "argument" },
-        { label: "Back to your robbery from the beginning.", next: "from_beginning" },
-        { label: "Let's list suspects again.", next: "suspects_menu" },
-        { label: "[Leave]", next: "end" },
-      ],
-    },
-
-    argument: {
-      segments: [
-        { speaker: "jim", text: "Argument? Oh… no. I haven't heard anything." },
-        { speaker: "donna", text: "Can't say I have either.", voice: "argument_02" },
-      ],
-      choices: [
-        { label: "Back to the odd missing $20.", next: "comment_on_odd" },
-        { label: "Back to John's robbery.", next: "john" },
-        { label: "Back to suspects.", next: "suspects_menu" },
+        { label: "Back to the timeline.", next: "timeline_menu" },
+        { label: "Let's talk about your neighbors", next: "suspects_menu_silent" },
+        { label: "[Leave]", next: "end_01" },
       ],
     },
 
@@ -259,11 +294,12 @@ const jimDonnaDialogue = {
           voice: "odd"
         },
       ],
+      set: { flagsAdd: ["asked_comment_on_odd"] },
       choices: [
         { label: "Seems more likely you misplaced it, Jim.", next: "accuse_jim_followup" },
         { label: "Maybe Sam stole it.", next: "accuse_sam_followup" },
         { label: "Maybe it was taken after the wallet was returned.", next: "accuse_after_return_followup" },
-        { label: "Back to the timeline.", next: "checked_when" },
+        { label: "Back to the timeline.", next: "timeline_menu" },
       ],
     },
 
@@ -280,10 +316,12 @@ const jimDonnaDialogue = {
           voice: "sam_accuse_02"
         },
       ],
+      set: { flagsAdd: ["asked_accuse_sam_followup"] },
       choices: [
         { label: "Tell me more about Sam.", next: "sam_info" },
-        { label: "Alright. What about other suspects?", next: "suspects_menu" },
-        { label: "Back.", next: "comment_on_odd" },
+        { label: "Alright. What about other neighbors", next: "suspects_menu_silent" },
+        { label: "Back to the timeline.", next: "timeline_menu" },
+        { label: "[Leave]", next: "end_01" },
       ],
     },
 
@@ -297,9 +335,11 @@ const jimDonnaDialogue = {
         },
         { speaker: "donna", text: "…" },
       ],
+      set: { flagsAdd: ["asked_accuse_jim_followup"] },
       choices: [
-        { label: "So misplacing the bill *is* possible.", next: "timeline_uncertain" },
-        { label: "Back to suspects.", next: "suspects_menu" },
+        { label: "Let's talk about your neighbors", next: "suspects_menu_silent" },
+        { label: "Back to the timeline.", next: "timeline_menu" },
+        { label: "[Leave]", next: "end_01" },
       ],
     },
 
@@ -316,44 +356,11 @@ const jimDonnaDialogue = {
           voice: "table_02"
         },
       ],
+      set: { flagsAdd: ["asked_accuse_after_return_followup"] },
       choices: [
-        { label: "Let's list every visitor again.", next: "visitors1" },
-        { label: "Were there moments the house was unlocked?", next: "house_unlocked" },
         { label: "*sigh* you can't be serious.", next: "poke_03" },
-        { label: "Back to suspects.", next: "suspects_menu" },
-      ],
-    },
-
-    house_unlocked: {
-      segments: [{ speaker: "jim", text: "Sorry, detective. We weren't as careful as we should've been." }],
-      set: { cluesAdd: ["clue_house_unlocked_possible"] },
-      choices: [
-        { label: "Someone bold. Or someone who knew you.", next: "suspects_menu" },
-        { label: "Alright. Let's move on.", next: "timeline_uncertain" },
-      ],
-    },
-
-    visitors1: {
-      segments: [
-        { speaker: "donna", text: "Visitors? Not many. Just neighbors, really.", voice: "menu" },
-        { speaker: "jim", text: "No parties. No family visits. Just normal days." },
-      ],
-      set: { cluesAdd: ["clue_few_visitors"] },
-      choices: [
-        { label: "Let's talk neighbors.", next: "neighbors" },
-        { label: "Back to suspects.", next: "suspects_menu" },
-        { label: "[Leave]", next: "end" },
-      ],
-    },
-
-    suspects_menu: {
-      segments: [{ speaker: "donna", text: "Alright. Who do you want to ask about?", voice: "menu" }],
-      choices: [
-        { label: "Sam", next: "sam_info" },
-        { label: "John", next: "john_info" },
-        { label: "Tim", next: "tim_info" },
-        { label: "Back to the timeline.", next: "checked_when" },
-        { label: "[Leave]", next: "end" },
+        { label: "Back to your neighbors.", next: "suspects_menu_silent" },
+        { label: "Back to the timeline.", next: "timeline_menu" },
       ],
     },
 
@@ -363,63 +370,45 @@ const jimDonnaDialogue = {
         { label: "Sam", next: "sam_info" },
         { label: "John", next: "john_info" },
         { label: "Tim", next: "tim_info" },
-        { label: "Back.", next: "suspects_menu" },
+        { label: "Back.", next: "suspects_menu_silent" },
       ],
     },
+
 
     sam_info: {
-      segments: [{ speaker: "donna", text: "Sam is a sweet girl. Always waves when we see her." }],
+      segments: [{ speaker: "donna", text: "" }],
       choices: [
-        { label: "Does she have any reason to take it?", next: "sam_position" },
-        { label: "Back.", next: "suspects_menu" },
-      ],
-    },
-
-    sam_position: {
-      segments: [
-        { speaker: "donna", text: "I don't think she'd steal. But I guess nobody is perfect." },
-        { speaker: "jim", text: "If the wallet was just sitting out there… anyone could've seen it." },
-      ],
-      choices: [
-        { label: "Okay.", next: "suspects_menu" },
-        { label: "Back to the timeline.", next: "checked_when" },
+        { label: "Back.", next: "suspects_menu_silent" },
+        { label: "Back to the timeline.", next: "timeline_menu" },
       ],
     },
 
     john_info: {
       segments: [
-        { speaker: "donna", text: "John keeps to himself. Lately he's been tense." },
         {
           speaker: "jim", text: "John is a quiet fellow. Keeps to himself mostly.",
           voice: "john_info_02"
         },
       ],
-      choices: [{ label: "Back.", next: "suspects_menu" }],
+      choices: [
+        { label: "Back.", next: "suspects_menu_silent" },
+        { label: "Back to the timeline.", next: "timeline_menu" },
+      ],
     },
 
     tim_info: {
-      segments: [{ speaker: "donna", text: "Tim is a rude fellow." }],
+      segments: [{ speaker: "donna", text: "Tim is a rude fellow." },
+      {
+        speaker: "jim",
+        text: "He once told me my mailbox was 'an eyesore to the community.'",
+        voice: "tim_04"
+      },
+      ],
       choices: [
         { label: "Go on.", next: "tim_followup" },
-        { label: "Back.", next: "suspects_menu" },
-      ],
-    },
-
-    tim_followup: {
-      segments: [
-        {
-          speaker: "donna",
-          text: "Tim… well, he's the kind who complains about everyone else. Property values, lawns, cars—everything.",
-        },
-        {
-          speaker: "jim",
-          text: "He once told me my mailbox was 'an eyesore to the community.'",
-          voice: "tim_04"
-        },
-      ],
-      choices: [
-        { label: "Would he take $20?", next: "tim_motive" },
-        { label: "Back.", next: "suspects_menu" },
+        { label: "Would he take $20?", next: "tim_motive"},
+        { label: "Back.", next: "suspects_menu_silent" },
+        { label: "Back to the timeline.", next: "timeline_menu" },
       ],
     },
 
@@ -431,62 +420,70 @@ const jimDonnaDialogue = {
           voice: "tim_mot_02"
         },
       ],
-      set: { cluesAdd: ["clue_tim_is_opportunist"] },
+      set: { flagsAdd: ["asked_tim_motive"] },
       choices: [
-        { label: "Back to suspects.", next: "suspects_menu" },
-        { label: "[Leave]", next: "end" },
+        { label: "Back to your neighbors.", next: "suspects_menu_silent" },
+        { label: "Back to the timeline.", next: "timeline_menu" },
+        { label: "[Leave]", next: "end_01" },
       ],
     },
 
-    timeline_uncertain: {
-      segments: [
-        {
-          speaker: "donna",
-          text: "Everything happened over a few days. Hard to say exactly when that bill went missing.",
-        },
-      ],
-      choices: [
-        { label: "Anyone come by those days?", next: "visitors1" },
-        { label: "Let's talk suspects.", next: "suspects_menu" },
-        { label: "That's all I needed for now. (end)", next: "end" },
-      ],
-    },
 
     poke_01: {
       segments: [
         { speaker: "donna", text: "Detective…", voice: "" },
-        { speaker: "jim", text: "Yeah. Sorry. I'm trying here.",
+        {
+          speaker: "jim", text: "Yeah. Sorry. I'm trying here.",
           voice: "poke_02"
-         },
+        },
       ],
       choices: [
-        { label: "Fine. Continue.", next: "from_beginning" },
+        { label: "Fine. Continue.", next: "timeline_menu" },
         { label: "Let's talk about the money.", next: "money_missing" },
+        { label: "Ask about John's robbery.", next: "john" },
+        { label: "Let's talk about your neighbors.", next: "suspects_menu_silent" },
       ],
     },
 
     poke_02: {
       segments: [
-        { speaker: "jim", text: "Ha. Yeah— we checked. Multiple times.",
-          voice:"poke_03"
-         },
+        {
+          speaker: "jim", text: "The couch? Yeah we actually did, we didn't find it.",
+          voice: "poke_03"
+        },
         { speaker: "donna", text: "Very funny, detective." },
       ],
       choices: [
-        { label: "Alright. Back to business.", next: "checked_when" },
-        { label: "Let's talk suspects.", next: "suspects_menu" },
+        { label: "Alright. Back to business.", next: "timeline_menu" },
+        { label: "Let's talk about your neighbors.", next: "suspects_menu_silent" },
+        { label: "Ask about John's robbery.", next: "john" },
       ],
     },
 
     poke_03: {
       segments: [{ speaker: "donna", text: "Detective… please.", voice: "" }],
       choices: [
-        { label: "Yeah. Sorry.", next: "suspects_menu" },
+        { label: "Yeah. Sorry.", next: "suspects_menu_silent" },
         { label: "Back.", next: "accuse_after_return_followup" },
+        { label: "Back to the timeline.", next: "timeline_menu" },
       ],
     },
 
-    end: {
+    end_01: {
+      segments: [
+        {
+          speaker: "jim", text: "Bye.",
+          voice: ""
+        },
+      ],
+      choices: [
+        { label: "Alright. Back to business.", next: "timeline_menu" },
+        { label: "Let's talk about your neighbors.", next: "suspects_menu_silent" },
+        { label: "Ask about John's robbery.", next: "john" },
+      ],
+    },
+
+    end_02: {
       segments: [],
       end: true,
       choices: [],
