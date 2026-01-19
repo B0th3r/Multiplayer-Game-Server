@@ -22,6 +22,7 @@ function canShow(choice) {
   if (r.cluesAll && !r.cluesAll.every(hasClue)) return false;
   if (r.cluesAny && !r.cluesAny.some(hasClue)) return false;
   if (r.notFlags && r.notFlags.some(hasFlag)) return false;
+  if (r.notClues && r.notClues.some(hasClue)) return false;
   return true;
 }
 
@@ -309,6 +310,14 @@ export default function App() {
       { flag: "cutscene_going_to_maya", cutsceneId: "going_to_maya" },
       { flag: "cutscene_marcus_enters", cutsceneId: "marcus_enters" },
       { flag: "cutscene_maya_leaves", cutsceneId: "maya_leaves" },
+      { flag: "cutscene_leave_pd", cutsceneId: "leave_pd" },
+      { flag: "cutscene_accuse_sam", cutsceneId: "accuse_sam" },
+      { flag: "cutscene_accuse_tim", cutsceneId: "accuse_tim" },
+      { flag: "cutscene_accuse_john", cutsceneId: "accuse_john" },
+      { flag: "cutscene_accuse_jane", cutsceneId: "accuse_jane" },
+      { flag: "cutscene_accuse_florist", cutsceneId: "accuse_florist" },
+      { flag: "cutscene_accuse_jim", cutsceneId: "accuse_jim" },
+      { flag: "cutscene_accuse_donna", cutsceneId: "accuse_donna" },
 
     ];
 
@@ -319,6 +328,7 @@ export default function App() {
       setDialogue,
       npcs,
       setNpcs,
+      DIALOGUE,
     };
 
     for (const { flag, cutsceneId } of cutsceneTriggers) {
@@ -421,6 +431,7 @@ export default function App() {
           setDialogue,
           npcs,
           setNpcs,
+          DIALOGUE,
         });
       }
       setDialogue(null);
@@ -519,7 +530,7 @@ export default function App() {
             >
               Press Esc to close
             </button>
-          </div>loadNamedMap
+          </div>
         </div>
       </div>
     );
@@ -541,16 +552,124 @@ export default function App() {
     );
 
     if (def.autoStartDialogue) {
-      const npc = def.npcs.find(n => n.id === def.autoStartDialogue);
-      if (npc && DIALOGUE[npc.dialogueId]) {
-        setDialogue({
-          npcId: npc.id,
-          npcName: npc.name,
-          dlgId: npc.dialogueId,
-          nodeId: DIALOGUE[npc.dialogueId].start,
-        });
+      const ok =
+        !def.autoStartRequires ||
+        (def.autoStartRequires.flagsAny &&
+          def.autoStartRequires.flagsAny.some((f) => GAME.flags.has(f))) ||
+        (def.autoStartRequires.flagsAll &&
+          def.autoStartRequires.flagsAll.every((f) => GAME.flags.has(f)));
+
+      if (ok) {
+        const npc = def.npcs.find((n) => n.id === def.autoStartDialogue);
+        if (npc && DIALOGUE[npc.dialogueId]) {
+          setDialogue({
+            npcId: npc.id,
+            npcName: npc.name,
+            dlgId: npc.dialogueId,
+            nodeId: DIALOGUE[npc.dialogueId].start,
+          });
+        }
       }
     }
+    let spawnList = [...(def.npcs ?? [])];
+
+    const movedToBar = GAME.flags.has("bobby_investigation_bar");
+    const johnTimActive = GAME.flags.has("talkedToJane");
+    const marcusActive = GAME.flags.has("BobbyDirty") || GAME.flags.has("BobbyGood");
+    const comfortScene = GAME.flags.has("marcus_comforts_bobby_bar");
+
+    if (name === "bar") {
+      if (comfortScene) {
+
+        spawnList = spawnList.filter(n => n.id !== "marcus" && n.id !== "bobby");
+
+        // spawn them at the requested tiles
+        spawnList.push(
+          {
+            id: "marcus",
+            x: 9, y: 14,
+            gid: 1109,
+            dialogueId: "marcusBar",
+          },
+          {
+            id: "bobby",
+            x: 9, y: 15,
+            gid: 3586,
+            dialogueId: "marcusBar",
+          }
+        );
+      }
+    }
+
+    if (name === "city") {
+      if (marcusActive) {
+        // ensure Marcus exists on the city map
+        spawnList = spawnList.filter(n => n.id !== "marcus");
+        spawnList.push({
+          id: "marcus",
+          name: "Marcus",
+          x: 12, y: 8,          // pick the tile where he should appear
+          gid: 1109,            // use Marcus sprite gid
+          dialogueId: "marcus", // your marcus.js dialogue id
+        });
+      } else {
+        // if flags not present, Marcus should not be on city map
+        spawnList = spawnList.filter(n => n.id !== "marcus");
+      }
+    }
+
+    if (johnTimActive && name !== "neighborhood") {
+
+      spawnList = spawnList.filter(n => n.id !== "john" && n.id !== "tim");
+
+      spawnList.push(
+        { id: "john", name: "John", x: 31, y: 19, gid: 1109, dialogueId: "johnTim" },
+        { id: "tim", name: "Tim", x: 32, y: 19, gid: 1109, dialogueId: "johnTim" }
+      );
+    }
+
+
+    if (movedToBar) {
+      if (name === "bar") {
+        // ensure only one bobby
+        spawnList = spawnList.filter(n => n.id !== "bobby");
+        spawnList.push({
+          id: "bobby",
+          name: "bobby",
+          x: 3,
+          y: 12,
+          gid: 3586,
+          dialogueId: "bobbyBartender",
+        });
+      }
+
+      if (name === "neighborhood") {
+        spawnList = spawnList.filter(n => n.id !== "delivery_girl");
+        spawnList.push({
+          id: "delivery_girl",
+          x: 60,
+          y: 21,
+          gid: 106,
+          dialogueId: "delivery_girl",
+        });
+      }
+      if (name === "city") {
+        spawnList = spawnList.filter(n => n.id !== "bobby" && n.id !== "delivery_girl");
+      }
+    }
+
+    setNpcs(
+      spawnList.map((n) =>
+        createNpc({
+          id: n.id,
+          name: n.name,
+          x: n.x,
+          y: n.y,
+          gid: n.gid,
+          dialogueId: n.dialogueId,
+        })
+      )
+    );
 
     playerRef.current.x = def.start.x;
     playerRef.current.y = def.start.y;
@@ -599,9 +718,10 @@ export default function App() {
     const p = playerRef.current;
     for (const ex of def.exits) {
       if (p.x === ex.x && p.y === ex.y) {
+        setTransitionMessage("Traveling...");
         document.body.style.setProperty(
           "transition",
-          "background-color 150ms"
+          "background-color 400ms ease-in-out"
         );
         document.body.style.backgroundColor = "#000";
         setTimeout(async () => {
@@ -609,18 +729,21 @@ export default function App() {
             await loadNamedMap(ex.to);
             playerRef.current.x = ex.toStart.x;
             playerRef.current.y = ex.toStart.y;
+            setTimeout(() => {
+              setTransitionMessage(null);
+              document.body.style.backgroundColor = "";
+            }, 300);
           } catch (e) {
             console.error("[map-exit]", e);
             alert("Failed to load area. Try again.");
-          } finally {
+            setTransitionMessage(null);
             document.body.style.backgroundColor = "";
           }
-        }, 120);
+        }, 400);
         break;
       }
     }
   }
-
   function getCollisionLayer() {
     if (!map) return null;
     const named = map.layers[1];
@@ -765,6 +888,7 @@ export default function App() {
             setDialogue,
             npcs,
             setNpcs,
+            DIALOGUE,
           });
         }
       }
@@ -871,6 +995,15 @@ export default function App() {
             if (npc.id === "tim" && GAME.flags.has("tim_shutdown") && dlg.nodes.shutdown) {
               startNode = "shutdown";
             }
+            if (npc.dialogueId === "marcusBar") {
+              if (GAME.flags.has("GainedMarcusTrust") && GAME.flags.has("BobbyDirty") && dlg.nodes.bar_dirty_pass) {
+                startNode = "bar_dirty_pass";
+              } else if (GAME.flags.has("BobbyDirty") && dlg.nodes.bar_dirty_failed) {
+                startNode = "bar_dirty_failed";
+              } else if (GAME.flags.has("BobbyGood") && dlg.nodes.bar_clean_praise) {
+                startNode = "bar_clean_praise";
+              }
+            }
 
             setDialogue({
               npcId: npc.id,
@@ -914,7 +1047,9 @@ export default function App() {
       ctx.fillRect(0, 0, c.width / SCALE, c.height / SCALE);
 
       const cam = cameraRef.current;
-
+      let markerIndex = 0;
+      const mapName = currentMapNameRef.current;
+      const mapDef = MAPS[mapName];
       // Draw tile layers
       for (const layer of map.layers) {
         for (let ry = 0; ry < effRows; ry++) {
@@ -931,7 +1066,83 @@ export default function App() {
           }
         }
       }
+      if (mapDef?.exits) {
+        for (const exit of mapDef.exits) {
+          const rx = (exit.x - cam.x) * tw;
+          const ry = (exit.y - cam.y) * th;
 
+          // Pulsing glow animation
+          const pulseSpeed = 0.002;
+          const pulseValue = Math.sin(now * pulseSpeed) * 0.5 + 0.5;
+
+          ctx.save();
+
+          // Outer glow
+          const gradient = ctx.createRadialGradient(
+            rx + tw / 2, ry + th / 2, 0,
+            rx + tw / 2, ry + th / 2, tw * (1.2 + pulseValue * 0.3)
+          );
+          gradient.addColorStop(0, `rgba(34, 211, 238, ${0.4 + pulseValue * 0.3})`);
+          gradient.addColorStop(0.5, `rgba(34, 211, 238, ${0.2 + pulseValue * 0.2})`);
+          gradient.addColorStop(1, 'rgba(34, 211, 238, 0)');
+
+          ctx.fillStyle = gradient;
+          ctx.fillRect(rx - tw, ry - th, tw * 3, th * 3);
+
+          // Rotating border effect
+          const rotation = (now * 0.001) % (Math.PI * 2);
+          ctx.translate(rx + tw / 2, ry + th / 2);
+          ctx.rotate(rotation);
+
+          // Draw rotating corners
+          const cornerSize = tw * 0.3;
+          const offset = tw * 0.35;
+          ctx.strokeStyle = `rgba(34, 211, 238, ${0.7 + pulseValue * 0.3})`;
+          ctx.lineWidth = 2;
+
+          for (let i = 0; i < 4; i++) {
+            ctx.save();
+            ctx.rotate((Math.PI / 2) * i);
+            ctx.beginPath();
+            ctx.moveTo(offset, -offset);
+            ctx.lineTo(offset + cornerSize, -offset);
+            ctx.lineTo(offset, -offset + cornerSize);
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          ctx.restore();
+
+          // Draw arrow pointing up with shimmer
+          ctx.save();
+          const arrowX = rx + tw / 2;
+          const arrowY = ry + th / 2;
+
+          ctx.shadowColor = 'rgba(34, 211, 238, 0.8)';
+          ctx.shadowBlur = 8 + pulseValue * 4;
+          ctx.fillStyle = `rgba(34, 211, 238, ${0.9 + pulseValue * 0.1})`;
+
+          ctx.beginPath();
+          ctx.moveTo(arrowX, arrowY - th * 0.25);
+          ctx.lineTo(arrowX - tw * 0.2, arrowY + th * 0.1);
+          ctx.lineTo(arrowX + tw * 0.2, arrowY + th * 0.1);
+          ctx.closePath();
+          ctx.fill();
+
+          // Add small particles floating up
+          const particleY = (now * 0.05) % th;
+          ctx.fillStyle = `rgba(34, 211, 238, ${1 - particleY / th})`;
+          for (let i = 0; i < 3; i++) {
+            const px = arrowX + (Math.sin(now * 0.003 + i) * tw * 0.15);
+            const py = arrowY + th * 0.2 - particleY + (i * th * 0.15);
+            ctx.beginPath();
+            ctx.arc(px, py, 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          ctx.restore();
+        }
+      }
       // Draw NPCs with proximity glow
       for (const npc of npcs) {
         const info = gidToDrawInfo(npc.gid, map.tilesets);
@@ -953,10 +1164,6 @@ export default function App() {
         ctx.drawImage(info.img, info.sx, info.sy, info.sw, info.sh, rx, ry, tw, th);
         ctx.restore();
       }
-      let markerIndex = 0;
-      const mapName = currentMapNameRef.current;
-      const mapDef = MAPS[mapName];
-
       for (const obj of activeObjectives) {
         const waypoints = getObjectiveWaypoints(obj, GAME);
 
@@ -978,8 +1185,6 @@ export default function App() {
           markerIndex++;
         }
       }
-
-
 
       // Draw player
       const p = playerRef.current;
