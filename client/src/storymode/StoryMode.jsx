@@ -4,7 +4,7 @@ import { DIALOGUE } from "./dialogue/index.js";
 import { GAME, MAPS, SPRITE } from "./environment/gameConfig.js";
 import { loadTMJ, loadImage, gidToDrawInfo, loadNpcImages } from "./environment/tmjLoader.js";
 import ObjectivesPanel from './objectives';
-import { playVoice, stopVoice } from "./environment/audioManager.js";
+import { playVoice, stopVoice, getVoiceDuration } from "./environment/audioManager.js";
 import { playCutscene } from './environment/cutsceneManager.js';
 
 const hasFlag = (f) => GAME.flags.has(f);
@@ -42,7 +42,7 @@ function useKeyboard() {
     const down = (e) => {
       const k = e.key.toLowerCase();
       if (
-        ["w", "a", "s", "d", "arrowup", "arrowleft", "arrowdown", "arrowright", "e", "p",
+        ["w", "a", "s", "d", "arrowup", "arrowleft", "arrowdown", "arrowright", "e",
           "escape",].includes(k)
       ) {
         e.preventDefault();
@@ -147,39 +147,6 @@ function MobileControls({ onPress, onRelease, show = true }) {
   );
 }
 
-function TilesetPreview({ tilesets }) {
-  if (!tilesets || tilesets.length === 0) return null;
-
-  return (
-    <div className="absolute top-14 right-2 z-[100] bg-slate-900/95 backdrop-blur rounded-xl p-2 ring-1 ring-white/10 max-h-[70vh] overflow-auto w-64">
-      <div className="text-xs font-semibold mb-2">Tilesets (Debug)</div>
-
-      {tilesets.map((ts, i) => {
-        const img = ts.img;
-        if (!img) return null;
-
-        return (
-          <div key={i} className="mb-3">
-            <div className="text-xs opacity-70 mb-1">
-              {ts.name} • firstgid {ts.firstgid}
-            </div>
-
-            <img
-              src={img.src}
-              style={{
-                imageRendering: "pixelated",
-                maxWidth: "100%",
-                borderRadius: 6,
-                border: "1px solid rgba(255,255,255,0.1)"
-              }}
-            />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function createNpc({ id, name, x, y, gid, dialogueId }) {
   return { id, name, x, y, gid, dialogueId, cooldownMs: 400, };
 }
@@ -190,7 +157,6 @@ export default function App() {
   const canvasRef = useRef(null);
   const navigate = useNavigate();
   const [map, setMap] = useState(null);
-  const [showPalette, setShowPalette] = useState(false);
   const [npcs, setNpcs] = useState([]);
   const [dialogue, setDialogue] = useState(null);
   const [presenting, setPresenting] = useState(false);
@@ -218,6 +184,10 @@ export default function App() {
   const worldBufferRef = useRef(null);
   const worldBufferMetaRef = useRef({ mapName: null, w: 0, h: 0 });
   const [fadeOverlay, setFadeOverlay] = useState({ visible: false, color: "#000", duration: 0 });
+  const [isAutoDialogue, setIsAutoDialogue] = useState(true);
+  const [autoSpeed] = useState(1.0);
+
+  const autoTimerRef = useRef(null);
 
   const mapBufferRef = useRef(null);
   const mapBufferInfoRef = useRef({ name: null, w: 0, h: 0 });
@@ -366,11 +336,11 @@ export default function App() {
     _prevDir: "down",
   });
 
-function goToMainMenu() {
-  navigate("/"); 
-}
+  function goToMainMenu() {
+    navigate("/");
+  }
   useEffect(() => {
-    loadNamedMap("bar").catch(console.error);
+    loadNamedMap("office").catch(console.error);
   }, []);
   useEffect(() => {
     let cancelled = false;
@@ -401,6 +371,9 @@ function goToMainMenu() {
       { flag: "cutscene_accuse_jim", cutsceneId: "accuse_jim" },
       { flag: "cutscene_accuse_donna", cutsceneId: "accuse_donna" },
       { flag: "cutscene_lucas_goes_to_maya", cutsceneId: "lucas_goes_to_maya" },
+      { flag: "cutscene_marcus_leaves", cutsceneId: "marcus_leaves" },
+      { flag: "cutscene_bobby_comes", cutsceneId: "bobby_comes" },
+      { flag: "cutscene_bobby_moves_to_bartender", cutsceneId: "bobby_moves_to_bartender" },
       { flag: "cutscene_ending_master", cutsceneId: "ending_master" },
 
     ];
@@ -536,7 +509,6 @@ function goToMainMenu() {
     }
   }
 
-
   function DialogueOverlay({ dialogue, setDialogue }) {
     if (!dialogue) return null;
 
@@ -547,14 +519,17 @@ function goToMainMenu() {
     const choices = (node?.choices || []).filter(canShow);
 
     const hasSegments = Array.isArray(segments) && segments.length > 0;
+
     const visibleSegments = hasSegments
       ? segments.filter(seg => {
         if (!seg.requires) return true;
         return canShow({ requires: seg.requires });
       })
       : [];
+
     const totalSegments = visibleSegments.length;
     const atLastSegment = totalSegments <= 0 ? true : segmentIndex >= totalSegments - 1;
+
     function formatText(text) {
       if (!text) return text;
       return text.replace(/\{\{(\w+)\}\}/g, (_, key) => {
@@ -570,11 +545,56 @@ function goToMainMenu() {
       currentSeg = { speaker: dialogue.npcName, text: node.text };
     }
 
+    const currentText = formatText(currentSeg?.text ?? "");
+
+
+    function clearAutoTimer() {
+      if (autoTimerRef.current) {
+        clearTimeout(autoTimerRef.current);
+        autoTimerRef.current = null;
+      }
+    }
+
+    function advanceSegment() {
+      clearAutoTimer();
+      if (hasSegments && !atLastSegment) {
+        setSegmentIndex((i) => Math.min(i + 1, totalSegments - 1));
+        return;
+      }
+
+      if (!choices.length) {
+        setDialogue(null);
+      }
+    }
+
     return (
       <div className="absolute inset-0 pointer-events-none z-[60]">
         <div className="absolute left-0 right-0 bottom-3 flex justify-center">
-          <div className="pointer-events-auto w-full max-w-3xl mx-4 p-4 rounded-xl bg-slate-900/95 ring-1 ring-white/10">
-            <div className="text-xs opacity-60 mb-1">{dialogue.npcName}</div>
+          <div
+            className="pointer-events-auto w-full max-w-3xl mx-4 p-4 rounded-xl bg-slate-900/95 ring-1 ring-white/10"
+            onClick={() => {
+              if (choices.length) return;
+              advanceSegment();
+            }}
+          >
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <div className="text-xs opacity-60">{dialogue.npcName}</div>
+
+              {/* Auto controls */}
+              <div className="flex items-center gap-2">
+                <button
+                  className="px-2 py-1 rounded bg-slate-800/70 hover:bg-slate-700/70 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    clearAutoTimer();
+                    setIsAutoDialogue(v => !v);
+                  }}
+                  title="Toggle Auto"
+                >
+                  {isAutoDialogue ? "Auto: ON" : "Auto: OFF"}
+                </button>
+              </div>
+            </div>
 
             {/* Single current segment */}
             <div className="mb-3 space-y-1">
@@ -585,20 +605,24 @@ function goToMainMenu() {
                       {currentSeg.speaker}
                     </span>
                   )}
-                  <span>{formatText(currentSeg.text)}</span>
+                  <span>{currentText}</span>
                 </div>
               )}
             </div>
 
-
             {/* Next / Choices */}
             {hasSegments && !atLastSegment ? (
-              <div className="flex justify-end">
+              <div className="flex justify-between items-center">
+                <div className="text-xs opacity-50">
+                  Click/Tap to advance
+                </div>
+
                 <button
                   className="px-4 py-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-sm"
-                  onClick={() =>
-                    setSegmentIndex((i) => Math.min(i + 1, totalSegments - 1))
-                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    advanceSegment();
+                  }}
                 >
                   Next
                 </button>
@@ -609,7 +633,11 @@ function goToMainMenu() {
                   <button
                     key={i}
                     className="text-left px-3 py-2 rounded-lg bg-slate-800/70 hover:bg-slate-700/70 ring-1 ring-white/10"
-                    onClick={() => runChoice(c)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearAutoTimer();
+                      runChoice(c);
+                    }}
                   >
                     <span className="opacity-60 mr-2">{i + 1}.</span>
                     {c.label}
@@ -617,15 +645,8 @@ function goToMainMenu() {
                 ))}
               </div>
             ) : (
-              <div className="text-xs opacity-60">Press Esc to close</div>
+              <div className="text-xs opacity-60">Click to close • Press Esc to close</div>
             )}
-
-            <button
-              onClick={() => setDialogue(null)}
-              className="mt-3 text-sm text-slate-400 hover:text-slate-200"
-            >
-              Press Esc to close
-            </button>
           </div>
         </div>
       </div>
@@ -674,7 +695,6 @@ function goToMainMenu() {
         if (npcToStart && DIALOGUE[npcToStart.dialogueId]) {
           setDialogue({
             npcId: npcToStart.id,
-            npcName: npcToStart.name,
             dlgId: npcToStart.dialogueId,
             nodeId: DIALOGUE[npcToStart.dialogueId].start,
           });
@@ -715,14 +735,13 @@ function goToMainMenu() {
 
     if (name === "city") {
       if (marcusActive) {
-        // ensure Marcus exists on the city map
         spawnList = spawnList.filter(n => n.id !== "marcus");
         spawnList.push({
           id: "marcus",
           name: "Marcus",
-          x: 12, y: 8,          // pick the tile where he should appear
-          gid: 106,            // use Marcus sprite gid
-          dialogueId: "marcus", // your marcus.js dialogue id
+          x: 12, y: 8,          
+          gid: 106,            
+          dialogueId: "marcus", 
         });
       }
       if (mayaActive) {
@@ -1103,18 +1122,8 @@ function goToMainMenu() {
     const onKey = (e) => {
       const k = e.key.toLowerCase();
 
-      if (k === "p") {
-        setShowPalette((v) => !v);
-        return;
-      }
       if (k === "o") {
         toggleObjectives();
-        return;
-      }
-
-      if (k === "escape") {
-        setDialogue(null);
-        setPresenting(false);
         return;
       }
 
@@ -1195,7 +1204,107 @@ function goToMainMenu() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [npcs, dialogue]);
+  function computeDialogueDelayMs(text, speed = 1.0) {
+    const t = (text ?? "").trim();
 
+    const base = 650;
+
+    const perChar = 26;
+
+    const punct = (t.match(/[.!?]/g)?.length ?? 0) * 180
+      + (t.match(/[,;]/g)?.length ?? 0) * 90;
+
+    const raw = base + t.length * perChar + punct;
+
+    const clamped = Math.max(450, Math.min(raw, 6500));
+
+    return Math.round(clamped / Math.max(0.25, speed));
+  }
+
+  useEffect(() => {
+    console.log('=== AUTO EFFECT TRIGGERED ===');
+
+    if (!dialogue) {
+      if (autoTimerRef.current) {
+        clearTimeout(autoTimerRef.current);
+        autoTimerRef.current = null;
+      }
+      return;
+    }
+
+    const dlg = DIALOGUE[dialogue.dlgId];
+    const node = dlg?.nodes[dialogue.nodeId];
+    const segments = node?.segments;
+    const choices = (node?.choices || []).filter(canShow);
+
+    const hasSegments = Array.isArray(segments) && segments.length > 0;
+    const visibleSegments = hasSegments
+      ? segments.filter(seg => !seg.requires || canShow({ requires: seg.requires }))
+      : [];
+
+    const totalSegments = visibleSegments.length;
+    const atLastSegment = totalSegments <= 0 || segmentIndex >= totalSegments - 1;
+
+    const canAutoAdvance =
+      isAutoDialogue &&
+      hasSegments &&
+      !atLastSegment;
+
+    if (autoTimerRef.current) {
+      clearTimeout(autoTimerRef.current);
+      autoTimerRef.current = null;
+    }
+
+    if (!canAutoAdvance) {
+      return;
+    }
+
+    let currentSeg = null;
+    if (visibleSegments.length > 0) {
+      const idx = Math.min(segmentIndex, visibleSegments.length - 1);
+      currentSeg = visibleSegments[idx];
+    }
+
+    const currentText = currentSeg?.text ?? "";
+
+
+async function scheduleAdvance() {
+  let delay;
+
+  if (currentSeg?.speaker && currentSeg?.voice) {
+    try {
+      const audioDuration = await getVoiceDuration(
+        currentSeg.speaker.toLowerCase(), 
+        currentSeg.voice
+      );
+      
+      if (audioDuration && audioDuration > 0) {
+        delay = Math.round((audioDuration + 300) / autoSpeed);
+      } else {
+        console.warn('Audio duration invalid, using text timing');
+      }
+    } catch (err) {
+      console.warn('Failed to get audio duration, using text timing', err);
+    }
+  }
+
+  if (!delay) {
+    delay = computeDialogueDelayMs(currentText, autoSpeed, currentSeg?.speaker);
+  }
+
+  autoTimerRef.current = setTimeout(() => {
+    setSegmentIndex((i) => Math.min(i + 1, totalSegments - 1));
+  }, delay);
+}
+
+scheduleAdvance();
+    return () => {
+      if (autoTimerRef.current) {
+        clearTimeout(autoTimerRef.current);
+        autoTimerRef.current = null;
+      }
+    };
+  }, [dialogue?.dlgId, dialogue?.nodeId, segmentIndex, isAutoDialogue, autoSpeed]);
   function isAdjacentToPlayer(tx, ty) {
     const p = playerRef.current;
     if (currentMapNameRef.current === "shop") {
@@ -1224,7 +1333,6 @@ function goToMainMenu() {
     Math.min(maxRows, Math.floor(availH / (tileH * BASE_SCALE)))
   );
 
-  // Pick the largest integer scale that fits the camera window
   const scaleW = Math.floor(availW / (effCols * tileW));
   const scaleH = Math.floor(availH / (effRows * tileH));
   const renderScale = Math.max(1, Math.min(scaleW, scaleH));
@@ -1432,7 +1540,7 @@ function goToMainMenu() {
       ctx.font = "16px ui-sans-serif, system-ui, -apple-system";
       ctx.fillStyle = "#e5e7eb";
       ctx.fillText(
-        "WASD/Arrows: Move • E: Talk • 1-9: Choose • Esc: Close",
+        "WASD/Arrows: Move • E: Talk",
         12,
         22
       );
@@ -1454,14 +1562,13 @@ function goToMainMenu() {
 
   return (
     <div className="fixed inset-0 bg-slate-950 text-slate-100 overflow-hidden">
-      {showPalette && <TilesetPreview tilesets={map?.tilesets} />}
       <TopObjectiveBanner objective={activeObjectives?.[0]} />
       <div
         ref={viewportRef}
         className="absolute inset-0"
         style={{
           paddingTop: isShortHeight
-            ? "env(safe-area-inset-top)" 
+            ? "env(safe-area-inset-top)"
             : "calc(3.25rem + env(safe-area-inset-top))",
         }}
       >
@@ -1483,12 +1590,6 @@ function goToMainMenu() {
                 style={{ width, height }}
                 className="block"
               />
-              <div className="absolute left-2 top-2 z-[120] px-2 py-1 rounded-lg bg-slate-900/80 ring-1 ring-white/10 text-xs font-mono">
-                <div>Map: {currentMapNameRef.current}</div>
-                <div>Player: ({playerRef.current.x}, {playerRef.current.y})</div>
-                <div>Cam: ({cameraRef.current.x}, {cameraRef.current.y})</div>
-              </div>
-
               {!map && (
                 <div className="absolute inset-0 grid place-items-center text-sm text-slate-300">
                   Loading…
