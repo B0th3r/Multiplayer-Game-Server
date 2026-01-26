@@ -82,6 +82,10 @@ const marcusDialogue = {
       ],
     },
     pinned_on_bobby_02: {
+      set: { flagsAdd: ["marcus_scene_complete"] },
+      onEnter: (state) => {
+        state.flags.add("cutscene_marcus_leaves");
+      },
       segments: [
         { speaker: "marcus", text: "*sighs* I suppose that makes sense.", voice: "case" },
         { speaker: "marcus", text: "Damn it Bobby.", voice: "bobbyMad" },
@@ -107,7 +111,7 @@ const marcusDialogue = {
       onEnter: (state) => {
         state.flags.add("cutscene_marcus_leaves");
       },
-      set: { flagsAdd: ["marcus_caught"] },
+      set: { flagsAdd: ["marcus_caught", "marcus_scene_complete"] },
       segments: [
         { speaker: "marcus", text: "..." },
         { speaker: "marcus", text: "Look I know you're involved in this somehow after I interrogate Bobby I'll arrest you both.", voice: "caught" },
@@ -118,6 +122,7 @@ const marcusDialogue = {
     },
 
     end_01: {
+      set: { flagsAdd: ["marcus_scene_complete"] },
       onEnter: (state) => {
         state.flags.add("cutscene_marcus_leaves");
       },

@@ -16,6 +16,7 @@ const mayaDialogue = {
       onEnter: (state) => {
         state.flags.add("cutscene_maya_leaves");
       },
+      set: { flagsAdd: ["maya_scene_complete"] },
       segments: [
         { speaker: "maya", text: "I knew it. A loser like him couldn't have written that.", voice: "city_leave_02" },
         { text: "(Maya leaves)" },
@@ -26,6 +27,7 @@ const mayaDialogue = {
       onEnter: (state) => {
         state.flags.add("cutscene_maya_leaves");
       },
+      set: { flagsAdd: ["maya_scene_complete"] },
       segments: [
         { speaker: "maya", text: "Hm, really. Well that's all, see you later.", voice: "city_leave_01" },
         { text: "(Maya leaves)" },
