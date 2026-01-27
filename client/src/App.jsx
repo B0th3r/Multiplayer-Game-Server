@@ -1,10 +1,12 @@
-import { Routes, Route, Navigate, Outlet } from "react-router-dom"; 
+import { Routes, Route, Navigate, Outlet } from "react-router-dom";
+import MainMenu from "./views/MainMenu.jsx";
+import StoryMode from "./storymode/StoryMode.jsx";
 import RoomEntry from "./views/RoomEntry.jsx";
 import Lobby from "./views/Lobby.jsx";
 import ConnectFour from "./views/ConnectFour.jsx";
 import TicTacToe from "./views/TicTacToe.jsx";
 import Battleship from "./views/Battleship.jsx";
-import Blackjack from "./views/Blackjack.jsx";  
+import Blackjack from "./views/Blackjack.jsx";
 import MemoryMatching from "./views/MemoryMatching.jsx";
 import Riichi from "./views/Riichi.jsx";
 function AppShell() {
@@ -41,19 +43,21 @@ function AppShell() {
 
 
 export default function App() {
-    return (
-        <Routes>
-            <Route element={<AppShell />}>
-                <Route path="/" element={<RoomEntry />} />
-                <Route path="/room/:roomId" element={<Lobby />} />
-                <Route path="/connect4/:roomId" element={<ConnectFour />} />
-                <Route path="/TicTacToe/:roomId" element={<TicTacToe />} />
-                <Route path="/Battleship/:roomId" element={<Battleship />} />
-                <Route path="/Blackjack/:roomId" element={<Blackjack />} />
-                <Route path="/MemoryMatching/:roomId" element={<MemoryMatching />} />
-                <Route path="/Riichi/:roomId" element={<Riichi />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-        </Routes>
-    );
+  return (
+    <Routes>
+      <Route path="/single" element={<StoryMode />} />
+      <Route element={<AppShell />}>
+        <Route path="/" element={<MainMenu />} />
+        <Route path="/multi" element={<RoomEntry />} />
+        <Route path="/room/:roomId" element={<Lobby />} />
+        <Route path="/connect4/:roomId" element={<ConnectFour />} />
+        <Route path="/TicTacToe/:roomId" element={<TicTacToe />} />
+        <Route path="/Battleship/:roomId" element={<Battleship />} />
+        <Route path="/Blackjack/:roomId" element={<Blackjack />} />
+        <Route path="/MemoryMatching/:roomId" element={<MemoryMatching />} />
+        <Route path="/Riichi/:roomId" element={<Riichi />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
+  );
 }
