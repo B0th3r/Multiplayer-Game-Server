@@ -53,11 +53,11 @@ const DEFAULT_CREDITS = {
   sections: [
     { heading: "Developer", lines: ["Keshawn Bryant"] },
     {
-      heading: "Voice Cast", lines: ["Ace — Actor", "Alex — Henry", "Bartender — Keshawn", "Bobby — Micheal", "Delivery Girl — Saisindhu", "Donna — Riana",
+      heading: "Voice Cast", lines: ["Ace — Actor", "Alex — Henry", "Bartender — Keshawn", "Bobby — Michael", "Delivery Girl — Saisindhu", "Donna — Riana",
         "Florist — Anonymous", "Flower Promoter — Anonymous", "Gambler — Jaime", "Hayes — Garnett", "Jack — Keshawn",
-        "Jane — Kiona", "Jim — Keshawn", "John — Henry", "Lieutenant — Robbie", "Lucas — Marcus", "Marcus — Eli", "Maya — Micheala", "Sam — Jewelean", "Tim — Daniel"]
+        "Jane — Kiona", "Jim — Keshawn", "John — Henry", "Lieutenant — Robbie", "Lucas — Marcus", "Marcus — Eli", "Maya — Michaela", "Sam — Jewelean", "Tim — Daniel"]
     },
-    //{ heading: "Tilesets / Art", lines: ["SOURCE / CREATOR"] },
+    { heading: "Tilesets", lines: ["35 Character Pixel Art / yigitkinis", "Farm RPG 16x16 Tileset / Emanuelle", "Pixel Cyberpunk Interior / DyLESTorm", "City Pack / NYKNCK", "Village Building Interior Tileset / ay boy"] },
   ],
   footerLines: ["Thanks for playing."],
 };
@@ -77,21 +77,6 @@ export const CUTSCENES = {
       { type: "fade", duration: 600, color: "transparent" },
     ]
   },
-   boot: {
-    steps: [
-      { type: "fade", duration: 1000, color: "#000" },
-      { type: "requestName" },
-      { type: "loadMap", mapName: "office", spawn: { x: 10, y: 12 } },
-      {
-        type: "startDialogue",
-        npcId: "lieutenant",
-        dialogueId: "lieutenant"
-      },
-
-      { type: "fade", duration: 600, color: "transparent" },
-    ]
-  },
-
   leave_office: {
     steps: [
       { type: "fade", duration: 800, color: "#000" },
@@ -445,6 +430,8 @@ async function executeStep(step, context) {
       return new Promise(resolve => setTimeout(resolve, step.duration));
     case "requestName":
       return new Promise(resolve => {
+        context.flags.clear();
+        context.GAME.metadata.clear();
         const name = prompt("Detective, enter your name:");
         context.flags.add("named_player");
         context.GAME.metadata.set("playerName", name || "Detective");
